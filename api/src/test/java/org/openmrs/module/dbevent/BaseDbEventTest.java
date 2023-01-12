@@ -41,7 +41,11 @@ public abstract class BaseDbEventTest {
 		PatternLayout layout = PatternLayout.newBuilder().withPattern("%m").build();
 		memoryAppender = MemoryAppender.newBuilder().setLayout(layout).build();
 		memoryAppender.start();
-		setRuntimeProperties(new Properties());
+		Properties p = new Properties();
+		p.put("connection.username", "admin");
+		p.put("connection.password", "Admin123");
+		p.put("connection.url", "jdbc:mysql://localhost:3306/openmrs");
+		setRuntimeProperties(p);
 		loggers = new ArrayList<>();
 	}
 
