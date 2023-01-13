@@ -9,7 +9,7 @@ configure, and start a new DbEventSource for each EventConsumer.
 
 ## Event Sources
 
-Each event source represents and independent process that streams events from the OpenMRS database.  In the case of 
+Each event source represents an independent process that streams events from the OpenMRS database.  In the case of 
 MySQL, each Event Source is the equivalent of a new MySQL Replication Node, and is independently configured.  Each
 of these would independently take an initial snapshot of the database and streaming changes from the MySQL binlog.
 
