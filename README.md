@@ -7,6 +7,18 @@ This module is intended to be configured by a particular implementation in their
 create an implementation of EventConsumer to respond to a stream of DbEvents.  The distribution would instantiate,
 configure, and start a new DbEventSource for each EventConsumer.
 
+## Prerequisites
+
+This module should work with any database supported by Debezium...theoretically.  Currently, it is written with 
+MySQL in mind - as such, the documentation may be slanted to a MySQL-based configuration, and some tweaks may be 
+needed for other DBMS systems, specifically there likely need to be additional Debezium connector libraries included
+as Maven dependencies.  This is left for a future enhancement for now.
+
+For a MySQL-based setup, the primary pre-requisite on the MySQL end is that the MySQL instance has 
+[row-level bin logging enabled](https://debezium.io/documentation/reference/connectors/mysql.html#enable-mysql-binlog). 
+Additionally, the database user (by default the user configured in the runtime properties file, though this can be 
+overridden), needs to have [privileges to access the MySQL bin logs](https://debezium.io/documentation/reference/connectors/mysql.html#mysql-creating-user).
+
 ## Event Sources
 
 Each event source represents an independent process that streams events from the OpenMRS database.  In the case of 
