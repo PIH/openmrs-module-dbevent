@@ -95,6 +95,7 @@ public class DbEventSource {
                     case "dbname": {
                         setProperty("database.dbname", driverPropertyInfo.value);
                         setProperty("database.include.list", driverPropertyInfo.value);
+                        setProperty("table.include.list", driverPropertyInfo.value + ".*");
                         break;
                     }
                     default: break;
@@ -103,14 +104,6 @@ public class DbEventSource {
         }
         catch (Exception e) {
             throw new IllegalArgumentException("Invalid connection.url: " + url);
-        }
-
-        String propertyPrefix = "dbevent." + sourceId + ".";
-        for (String propertyName : runtimeProperties.stringPropertyNames()) {
-            if (propertyName.toLowerCase().startsWith(propertyPrefix)) {
-                String name = propertyName.substring(propertyPrefix.length());
-                setProperty(name, runtimeProperties.getProperty(propertyName));
-            }
         }
     }
 

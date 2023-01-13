@@ -30,7 +30,6 @@ public class DbEventModuleActivator extends BaseModuleActivator {
 		// TODO: Temporary for testing.  This would be added by a downstream module
 		DbEventSource eventSource = new DbEventSource(100002,"EventLogger", new ContextWrapper());
 		eventSource.setEventConsumer(new LoggingEventConsumer());
-		eventSource.configureTablesToInclude(Collections.singletonList("*"));
 		eventSource.start();
 	}
 	

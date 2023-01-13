@@ -47,6 +47,10 @@ starting up the source.
 For more details on these configuration settings and other available options, please consult the 
 [Debezium documentation](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties).
 
+By default, all tables will be monitored in the given database.  This can be overridden programmatically on the source,
+either by setting the property explicitly or using a convenience method.  Note, if setting manually, table names are
+regular expression patterns, and must start with the database as a prefix.
+
 ## Monitoring
 
 Debezium outputs several useful metrics via JMX as MBeans.  Information on these for MySQL 
@@ -60,7 +64,7 @@ To access these in development mode, one can do the following in their SDK:
 mvn openmrs-sdk:run -DserverId=myserverid -DMAVEN_OPTS="-Xmx1g -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9000 -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false"
 ```
 
-2. Open up JConsole (i.e. from terminal run `jconsole`).  Connect to `localhost` on port `9000` (changing as appropriate to match port used in step #1).
+2. Open up JConsole (i.e. from terminal run `jconsole`).  Connect to Remote Process at `localhost:9000` (match port used in step #1).
 3. Navigate to `MBeans` and find `debezium.mysql`.
 
 To access these from code, one can do so by getting the MBeanServer in the JVM: `ManagementFactory.getPlatformMBeanServer();`
