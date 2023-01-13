@@ -12,6 +12,9 @@ package org.openmrs.module.dbevent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openmrs.module.BaseModuleActivator;
+import org.openmrs.module.dbevent.consumer.LoggingEventConsumer;
+
+import java.util.Collections;
 
 /**
  * This class contains the logic that is run every time this module is either started or shutdown
@@ -23,6 +26,12 @@ public class DbEventModuleActivator extends BaseModuleActivator {
 	@Override
 	public void started() {
 		log.info("DB Event Module Started");
+
+		// TODO: Temporary for testing.  This would be added by a downstream module
+		DbEventSource eventSource = new DbEventSource(100002,"EventLogger", new ContextWrapper());
+		eventSource.setEventConsumer(new LoggingEventConsumer());
+		eventSource.configureTablesToInclude(Collections.singletonList("*"));
+		eventSource.start();
 	}
 	
 	@Override

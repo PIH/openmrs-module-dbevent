@@ -31,12 +31,17 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
      */
     @Override
     public final void accept(ChangeEvent<SourceRecord, SourceRecord> changeEvent) {
+        DbEventStatus status = null;
         try {
             DbEvent event = new DbEvent(changeEvent);
+            status = DbEventLog.log(event);
             eventConsumer.accept(event);
         }
         catch (Throwable e) {
             log.error("An error occurred processing change event: " + changeEvent  + ". Retrying in 1 minute", e);
+            if (status != null) {
+                status.setError(e);
+            }
             try {
                 TimeUnit.SECONDS.sleep(retryIntervalSeconds);
             }

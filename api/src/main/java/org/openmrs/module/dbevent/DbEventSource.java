@@ -72,6 +72,9 @@ public class DbEventSource {
         setProperty("database.history", "io.debezium.relational.history.FileDatabaseHistory");
         setProperty("database.history.file.filename", schemaHistoryDataFile.getAbsolutePath());
         setProperty("decimal.handling.mode", "double");
+        setProperty("tombstones.on.delete", "false");
+
+        // TODO: Consider snapshot.mode, snapshot.locking.mode, database.ssl.mode,
 
         // Initialize from runtime properties
         Properties runtimeProperties = context.getRuntimeProperties();
@@ -181,6 +184,7 @@ public class DbEventSource {
             log.info("Created directory: " + getOffsetsFile().getParentFile());
         }
 
+        log.info("Starting event consumer: " + eventConsumer);
         eventConsumer.startup();
 
         engine = DebeziumEngine.create(Connect.class)
@@ -188,6 +192,7 @@ public class DbEventSource {
                 .notifying(new DebeziumConsumer(eventConsumer, retryIntervalSeconds))
                 .build();
 
+        log.info("Starting execution engine");
         executor.execute(engine);
     }
 
@@ -197,6 +202,7 @@ public class DbEventSource {
     public void stop() {
         log.info("Stopping Event Source: " + sourceId);
         try {
+            log.info("Stopping event consumer: " + eventConsumer);
             eventConsumer.shutdown();
         }
         catch (Exception e) {
@@ -204,6 +210,7 @@ public class DbEventSource {
         }
         try {
             if (engine != null) {
+                log.info("Closing execution engine");
                 engine.close();
             }
         }
@@ -211,6 +218,7 @@ public class DbEventSource {
             log.warn("An error occurred while attempting to close the engine", e);
         }
         try {
+            log.info("Shutting down executor");
             executor.shutdown();
             while (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 log.info("Waiting another 5 seconds for the embedded engine to shut down");
