@@ -15,7 +15,7 @@ public class DbEvent implements Serializable {
 
     private final ChangeEvent<SourceRecord, SourceRecord> changeEvent;
     private final Long timestamp;
-    private final String serverName;
+    private final String sourceName;
     private final String table;
     private final Operation operation;
     private final ObjectMap key;
@@ -23,6 +23,11 @@ public class DbEvent implements Serializable {
     private final ObjectMap after;
     private final ObjectMap source;
 
+    /**
+     * Constructor that creates a DbEvent from a Debezium ChangeEvent.
+     * Note, that if tombstones are enabled, this will need to become null-safe on record.getValue()
+     * @param changeEvent the Debezium ChangeEvent
+     */
     public DbEvent(ChangeEvent<SourceRecord, SourceRecord> changeEvent) {
         this.changeEvent = changeEvent;
         try {
@@ -35,7 +40,7 @@ public class DbEvent implements Serializable {
             after = new ObjectMap(valueStruct.getStruct("after"));
             source = new ObjectMap(valueStruct.getStruct("source"));
             table = source.getString("table");
-            serverName = source.getString("name");
+            sourceName = source.getString("name");
         }
         catch (Exception e) {
             throw new RuntimeException(e);

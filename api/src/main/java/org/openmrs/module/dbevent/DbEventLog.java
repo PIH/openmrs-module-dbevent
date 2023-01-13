@@ -31,11 +31,11 @@ public class DbEventLog {
 		}
 
 		// Track the total number of table rows processed for a given source
-		getTableCounts(event.getServerName()).merge(event.getTable(), 1, Integer::sum);
+		getTableCounts(event.getSourceName()).merge(event.getTable(), 1, Integer::sum);
 
 		// Construct an Event status and set it as the most recent for the associated source and return it
 		DbEventStatus status = new DbEventStatus(event);
-		latestEvents.put(event.getServerName(), status);
+		latestEvents.put(event.getSourceName(), status);
 		return status;
 	}
 

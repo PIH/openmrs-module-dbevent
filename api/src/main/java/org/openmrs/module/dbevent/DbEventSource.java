@@ -59,8 +59,9 @@ public class DbEventSource {
         File offsetsDataFile = new File(dataDirectory, sourceId + "_offsets.dat");
         File schemaHistoryDataFile = new File(dataDirectory, sourceId + "_schema_history.dat");
 
-        // Initialize default values
-        setProperty("name", sourceId + " Event Source");
+        // Initialize default values for source configuration.  The full list for MySQL connector properties is here:
+        // https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties
+        setProperty("name", sourceName);
         setProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
         setProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
         setProperty("offset.storage.file.filename", offsetsDataFile.getAbsolutePath());
@@ -73,8 +74,6 @@ public class DbEventSource {
         setProperty("database.history.file.filename", schemaHistoryDataFile.getAbsolutePath());
         setProperty("decimal.handling.mode", "double");
         setProperty("tombstones.on.delete", "false");
-
-        // TODO: Consider snapshot.mode, snapshot.locking.mode, database.ssl.mode,
 
         // Initialize from runtime properties
         Properties runtimeProperties = context.getRuntimeProperties();
