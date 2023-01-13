@@ -154,10 +154,10 @@ public class DbEventSource {
     }
 
     /**
-     * Allows for resetting the stream.  This deletes any existing history and offset files.
+     * Allows for resetting the source.  This deletes any existing history and offset files.
      */
     public void reset() {
-        log.info("Resetting MySQL Event Source: " + sourceId);
+        log.info("Resetting Event Source: " + sourceId);
         FileUtils.deleteQuietly(getOffsetsFile());
         FileUtils.deleteQuietly(getDatabaseHistoryFile());
     }
@@ -198,7 +198,7 @@ public class DbEventSource {
             eventConsumer.shutdown();
         }
         catch (Exception e) {
-            log.error("Error shutting down event consumer", e);
+            log.warn("Error shutting down event consumer", e);
         }
         try {
             if (engine != null) {
