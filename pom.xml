@@ -6,7 +6,7 @@
 	<artifactId>dbevent</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<name>DBEvent Module</name>
+	<name>dbevent</name>
 	<description>Database Event Framework for OpenMRS Change Data Capture</description>
 
 	<organization>
@@ -25,6 +25,8 @@
 		<!-- 2.5.4 is set due to log4j2 dependency -->
 		<openmrsVersion>2.5.4</openmrsVersion>
 		<debeziumVersion>1.8.0.Final</debeziumVersion>
+		<lombokVersion>1.18.24</lombokVersion>
+		<testcontainersVersion>1.17.6</testcontainersVersion>
 
 		<!-- Other configuration -->
 		<MODULE_ID>${project.artifactId}</MODULE_ID>
@@ -138,8 +140,17 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<version>1.18.24</version>
+			<version>${lombokVersion}</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<!-- Testing -->
+
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>mysql</artifactId>
+			<version>${testcontainersVersion}</version>
+			<scope>test</scope>
 		</dependency>
 
 	</dependencies>

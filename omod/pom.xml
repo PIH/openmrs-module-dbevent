@@ -8,7 +8,7 @@
     </parent>
 
     <artifactId>dbevent-omod</artifactId>
-    <name>DB Event OMOD</name>
+    <name>dbevent-omod</name>
     <description>OMOD for dbevent module</description>
 
     <dependencies>

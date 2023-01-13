@@ -8,7 +8,7 @@
 
 	<artifactId>dbevent-api</artifactId>
 	<packaging>jar</packaging>
-	<name>DB Event API</name>
+	<name>dbevent-api</name>
 	<description>API for dbevent module</description>
 
 	<build>
