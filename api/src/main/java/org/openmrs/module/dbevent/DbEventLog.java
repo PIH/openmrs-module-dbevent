@@ -12,7 +12,13 @@ package org.openmrs.module.dbevent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.management.MBeanAttributeInfo;
+import javax.management.MBeanInfo;
+import javax.management.ObjectName;
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,5 +59,46 @@ public class DbEventLog {
 
 	public static Map<String, Integer> getTableCounts(String source) {
 		return tableCounts.computeIfAbsent(source, k -> new HashMap<>());
+	}
+
+	public static ObjectName getMonitoringBeanName(String sourceName) {
+		try {
+			return new ObjectName("debezium.mysql:type=connector-metrics,context=snapshot,server=" + sourceName);
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static MBeanInfo getMonitoringBean(String sourceName) {
+		try {
+			return ManagementFactory.getPlatformMBeanServer().getMBeanInfo(getMonitoringBeanName(sourceName));
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static List<String> getMonitoringBeanAttributeNames(String sourceName) {
+		try {
+			List<String> ret = new ArrayList<>();
+			MBeanInfo beanInfo = getMonitoringBean(sourceName);
+			for (MBeanAttributeInfo attribute : beanInfo.getAttributes()) {
+				ret.add(attribute.getName());
+			}
+			return ret;
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public static Object getMonitoringBeanAttribute(String sourceName, String att) {
+		try {
+			return ManagementFactory.getPlatformMBeanServer().getAttribute(getMonitoringBeanName(sourceName), att);
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }
