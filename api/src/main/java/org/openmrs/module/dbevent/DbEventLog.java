@@ -61,6 +61,9 @@ public class DbEventLog {
 		return tableCounts.computeIfAbsent(source, k -> new HashMap<>());
 	}
 
+	/**
+	 * See https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-monitoring
+	 */
 	public static ObjectName getMonitoringBeanName(String sourceName) {
 		try {
 			return new ObjectName("debezium.mysql:type=connector-metrics,context=snapshot,server=" + sourceName);
