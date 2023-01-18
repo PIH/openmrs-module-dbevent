@@ -13,6 +13,7 @@ import lombok.Data;
 
 /**
  * This class represents the status of a particular event
+ * This allows tracking events as they are streamed, and provides information on any errors associated
  */
 @Data
 public class DbEventStatus {

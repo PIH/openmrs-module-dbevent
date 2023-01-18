@@ -1,5 +1,8 @@
 package org.openmrs.module.dbevent;
 
+/**
+ * Represents a type of database operation
+ */
 public enum Operation {
 
     READ,

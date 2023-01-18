@@ -9,6 +9,11 @@ import org.openmrs.module.dbevent.consumer.EventConsumer;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+/**
+ * Implementation of a Debezium ChangeEvent consumer, which abstracts the Debezium API behind a DbEvent
+ * and ensures that the registered DbEvent EventConsumer is successfully processed before moving onto the next
+ * record, with a configurable retryInterval upon failure.
+ */
 public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, SourceRecord>> {
 
     private static final Logger log = LogManager.getLogger(DebeziumConsumer.class);
