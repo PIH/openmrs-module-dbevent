@@ -4,7 +4,6 @@ import io.debezium.engine.ChangeEvent;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openmrs.module.dbevent.consumer.EventConsumer;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -18,12 +17,12 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
 
     private static final Logger log = LogManager.getLogger(DebeziumConsumer.class);
 
+    private final DbEventSourceConfig eventSourceConfig;
     private final EventConsumer eventConsumer;
-    private final Integer retryIntervalSeconds;
 
-    public DebeziumConsumer(EventConsumer eventConsumer, Integer retryIntervalSeconds) {
+    public DebeziumConsumer(EventConsumer eventConsumer, DbEventSourceConfig eventSourceConfig) {
         this.eventConsumer = eventConsumer;
-        this.retryIntervalSeconds = retryIntervalSeconds;
+        this.eventSourceConfig = eventSourceConfig;
     }
 
     /**
@@ -48,7 +47,7 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
                 status.setError(e);
             }
             try {
-                TimeUnit.SECONDS.sleep(retryIntervalSeconds);
+                TimeUnit.SECONDS.sleep(eventSourceConfig.getRetryIntervalSeconds());
             }
             catch (Exception e2) {
                 log.error("An exception occurred while waiting to retry processing change event", e2);

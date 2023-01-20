@@ -22,10 +22,10 @@
 	</scm>
 
 	<properties>
-		<!-- 2.5.4 is set due to log4j2 dependency -->
-		<openmrsVersion>2.5.4</openmrsVersion>
+		<openmrsVersion>2.5.7</openmrsVersion>
 		<debeziumVersion>1.8.0.Final</debeziumVersion>
 		<lombokVersion>1.18.24</lombokVersion>
+		<rocksdbVersion>7.6.0</rocksdbVersion>
 		<testcontainersVersion>1.17.6</testcontainersVersion>
 
 		<!-- Other configuration -->
@@ -142,6 +142,13 @@
 			<artifactId>lombok</artifactId>
 			<version>${lombokVersion}</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<!-- Rocks DB -->
+		<dependency>
+			<groupId>org.rocksdb</groupId>
+			<artifactId>rocksdbjni</artifactId>
+			<version>${rocksdbVersion}</version>
 		</dependency>
 
 		<!-- Testing -->

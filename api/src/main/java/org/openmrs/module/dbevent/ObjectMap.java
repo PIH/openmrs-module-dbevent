@@ -28,6 +28,11 @@ public class ObjectMap extends HashMap<String, Object> {
         return ret == null ? null : (Integer)ret;
     }
 
+    public Long getLong(String key) {
+        Object ret = get(key);
+        return ret == null ? null : (Long)ret;
+    }
+
     public String getString(String key) {
         Object ret = get(key);
         return ret == null ? null : ret.toString();

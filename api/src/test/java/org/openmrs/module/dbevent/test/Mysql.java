@@ -32,7 +32,7 @@ public class Mysql implements Closeable {
                         "/etc/mysql/my.cnf"
                 )
                 .withCopyFileToContainer(
-                        MountableFile.forClasspathResource("mysql/setup-platform-2.5.8.sql"),
+                        MountableFile.forClasspathResource("mysql/initial-25x.sql"),
                         "/docker-entrypoint-initdb.d/setup.sql"
                 )
                 .withDatabaseName("openmrs_dbevent")

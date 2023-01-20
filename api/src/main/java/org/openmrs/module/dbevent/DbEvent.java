@@ -21,6 +21,7 @@ public class DbEvent implements Serializable {
     private final ObjectMap key;
     private final ObjectMap before;
     private final ObjectMap after;
+    private final ObjectMap values;
     private final ObjectMap source;
 
     /**
@@ -38,6 +39,7 @@ public class DbEvent implements Serializable {
             operation = Operation.parse(valueStruct.getString("op"));
             before = new ObjectMap(valueStruct.getStruct("before"));
             after = new ObjectMap(valueStruct.getStruct("after"));
+            values = (operation == Operation.DELETE ? before : after);
             source = new ObjectMap(valueStruct.getStruct("source"));
             table = source.getString("table");
             sourceName = source.getString("name");
@@ -45,10 +47,6 @@ public class DbEvent implements Serializable {
         catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public ObjectMap getValues() {
-        return operation == Operation.DELETE ? getBefore() : getAfter();
     }
 
     public String getUuid() {
