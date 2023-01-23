@@ -6,10 +6,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.File;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.DriverPropertyInfo;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -51,36 +50,20 @@ public class DbEventSourceConfig {
         setProperty("decimal.handling.mode", "double");
         setProperty("tombstones.on.delete", "false");
         setProperty("snapshot.mode", "when_needed");
+        setProperty("database.user", context.getDatabase().getUsername());
+        setProperty("database.password", context.getDatabase().getPassword());
+        setProperty("database.hostname", context.getDatabase().getHostname());
+        setProperty("database.port", context.getDatabase().getPort());
+        setProperty("database.dbname", context.getDatabase().getDatabaseName());
+        setProperty("database.include.list", context.getDatabase().getDatabaseName());
+    }
 
-        // Initialize from runtime properties
-        Properties runtimeProperties = context.getRuntimeProperties();
-        setProperty("database.user", runtimeProperties.getProperty("connection.username"));
-        setProperty("database.password", runtimeProperties.getProperty("connection.password"));
-        String url = runtimeProperties.getProperty("connection.url");
-        try {
-            Driver driver = DriverManager.getDriver(url);
-            for (DriverPropertyInfo driverPropertyInfo : driver.getPropertyInfo(url, null)) {
-                switch (driverPropertyInfo.name.toLowerCase()) {
-                    case "host": {
-                        setProperty("database.hostname", driverPropertyInfo.value);
-                        break;
-                    }
-                    case "port": {
-                        setProperty("database.port", driverPropertyInfo.value);
-                        break;
-                    }
-                    case "dbname": {
-                        setProperty("database.dbname", driverPropertyInfo.value);
-                        setProperty("database.include.list", driverPropertyInfo.value);
-                        break;
-                    }
-                    default: break;
-                }
-            }
-        }
-        catch (Exception e) {
-            throw new IllegalArgumentException("Invalid connection.url: " + url);
-        }
+    /**
+     * @return the configured database name
+     */
+    public String getDatabaseName() {
+        String ret = config.getProperty("database.dbname");
+        return ret == null ? null : ret.trim();
     }
 
     /**
@@ -89,8 +72,7 @@ public class DbEventSourceConfig {
      */
     public void configureTablesToInclude(String... tables) {
         if (tables != null && tables.length > 0) {
-            String databaseName = config.getProperty("database.dbname");
-            String tablePrefix = StringUtils.isNotBlank(databaseName) ? databaseName + "." : "";
+            String tablePrefix = StringUtils.isNotBlank(getDatabaseName()) ? getDatabaseName() + "." : "";
             String tableConfig = Arrays.stream(tables)
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
@@ -99,18 +81,56 @@ public class DbEventSourceConfig {
     }
 
     /**
+     * @return the configured tables to include, or an empty list if not configured
+     */
+    public List<String> getTablesToInclude() {
+        List<String> ret = new ArrayList<>();
+        String val = config.getProperty("table.include.list");
+        if (val != null) {
+            for (String tableName : val.split(",")) {
+                ret.add(tableName.trim());
+            }
+        }
+        return ret;
+    }
+
+    /**
      * Provides a mechanism to add tables to exclude
      * @param tables the list of tables to exclude.  If not prefixed with a database name, it will be added
      */
     public void configureTablesToExclude(String... tables) {
         if (tables != null && tables.length > 0) {
-            String databaseName = config.getProperty("database.dbname");
-            String tablePrefix = StringUtils.isNotBlank(databaseName) ? databaseName + "." : "";
+            String tablePrefix = StringUtils.isNotBlank(getDatabaseName()) ? getDatabaseName() + "." : "";
             String tableConfig = Arrays.stream(tables)
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
             config.setProperty("table.exclude.list", tableConfig);
         }
+    }
+
+    /**
+     * @return the configured tables to exclude, or an empty list if not configured
+     */
+    public List<String> getTablesToExclude() {
+        List<String> ret = new ArrayList<>();
+        String val = config.getProperty("table.exclude.list");
+        if (val != null) {
+            for (String tableName : val.split(",")) {
+                ret.add(tableName.trim());
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * @param table the table to check
+     * @return true if the table is included in the configuration
+     */
+    public boolean isIncluded(DatabaseTable table) {
+        String name = table.getDatabaseName() + "." + table.getTableName();
+        List<String> tablesToInclude = getTablesToInclude();
+        List<String> tablesToExclude = getTablesToExclude();
+        return (tablesToInclude.isEmpty() || tablesToInclude.contains(name)) && !tablesToExclude.contains(name);
     }
 
     /**

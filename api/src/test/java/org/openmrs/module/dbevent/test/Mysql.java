@@ -1,7 +1,6 @@
 package org.openmrs.module.dbevent.test;
 
 import lombok.Data;
-import org.openmrs.module.dbevent.ObjectMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MySQLContainer;
@@ -10,15 +9,14 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.Closeable;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.Properties;
 
 @Data
 public class Mysql implements Closeable {
 
     private static final Logger log = LoggerFactory.getLogger(Mysql.class);
+
+    public static final String DATABASE_NAME = "dbevent";
 
     private MySQLContainer<?> container;
 
@@ -35,7 +33,7 @@ public class Mysql implements Closeable {
                         MountableFile.forClasspathResource("mysql/initial-25x.sql"),
                         "/docker-entrypoint-initdb.d/setup.sql"
                 )
-                .withDatabaseName("openmrs_dbevent")
+                .withDatabaseName(DATABASE_NAME)
                 .withLogConsumer(new Slf4jLogConsumer(log));
         container.start();
         mysql.setContainer(container);
@@ -64,34 +62,5 @@ public class Mysql implements Closeable {
         if (container != null) {
             container.stop();
         }
-    }
-
-    public void executeUpdate(String sql) {
-        try (Connection conn = container.createConnection(""); Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate(sql);
-        }
-        catch (Exception e) {
-            throw new RuntimeException("An error occurred executing update statement: " + sql);
-        }
-    }
-
-    public Dataset executeQuery(String sql) {
-        Dataset ret = new Dataset();
-        try (Connection conn = container.createConnection(""); Statement stmt = conn.createStatement()) {
-            try (ResultSet rs = stmt.executeQuery(sql)) {
-                int columnCount = rs.getMetaData().getColumnCount();
-                while (rs.next()) {
-                    ObjectMap row = new ObjectMap();
-                    for (int i=1; i<=columnCount; i++) {
-                        row.put(rs.getMetaData().getColumnName(i), rs.getObject(i));
-                    }
-                    ret.add(row);
-                }
-            }
-        }
-        catch (Exception e) {
-            throw new RuntimeException("An error occurred executing update statement: " + sql);
-        }
-        return ret;
     }
 }

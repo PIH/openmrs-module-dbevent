@@ -1,7 +1,10 @@
 package org.openmrs.module.dbevent.patient;
 
+import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openmrs.module.dbevent.DatabaseMetadata;
+import org.openmrs.module.dbevent.DatabaseTable;
 import org.openmrs.module.dbevent.DbEvent;
 import org.openmrs.module.dbevent.DbEventSourceConfig;
 import org.openmrs.module.dbevent.EventConsumer;
@@ -9,11 +12,10 @@ import org.openmrs.module.dbevent.Operation;
 import org.openmrs.module.dbevent.Rocks;
 
 import java.io.File;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.Timestamp;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Consumes patient-related events
@@ -22,19 +24,27 @@ public class PatientEventConsumer implements EventConsumer {
 
     private static final Logger log = LogManager.getLogger(PatientEventConsumer.class);
 
-    private DbEventSourceConfig config;
-    private Connection connection;
-    private Rocks keyMap;
-    private Rocks patientStatusMap;
-    private int eventCount = 0;
+    private final DbEventSourceConfig config;
+    private Rocks keysDb;
+    private Rocks statusDb;
+    private Long snapshotTimestamp = null;
+
+    public PatientEventConsumer(DbEventSourceConfig config) {
+        this.config = config;
+    }
 
     @Override
-    public void startup(DbEventSourceConfig config) {
+    public void startup() {
         try {
-            this.config = config;
-            connection = config.getContext().openConnection();
-            keyMap = new Rocks(new File(config.getContext().getModuleDataDir(), "keyMap.db"));
-            patientStatusMap = new Rocks(new File(config.getContext().getModuleDataDir(), "patientStatus.db"));
+            keysDb = new Rocks(new File(config.getContext().getModuleDataDir(), "keys.db"));
+            statusDb = new Rocks(new File(config.getContext().getModuleDataDir(), "status.db"));
+            snapshotTimestamp = statusDb.get("snapshotTimestamp");
+            if (snapshotTimestamp == null) {
+                long timestamp = System.currentTimeMillis();
+                performInitialSnapshot();
+                snapshotTimestamp = timestamp;
+                statusDb.put("snapshotTimestamp", snapshotTimestamp);
+            }
         }
         catch (Exception e) {
             throw new RuntimeException("An error occurred starting up", e);
@@ -43,210 +53,147 @@ public class PatientEventConsumer implements EventConsumer {
 
     @Override
     public void shutdown() {
-        config.getContext().closeConnection(connection);
-        keyMap.close();
-        patientStatusMap.close();
+        keysDb.close();
+        statusDb.close();
     }
 
     @Override
     public void accept(DbEvent event) {
-        switch (event.getTable()) {
-            case "patient":
-            case "patient_identifier":
-            case "patient_program":
-            case "visit":
-            case "encounter":
-            case "orders":
-            case "order_group":
-            case "allergy":
-            case "conditions":
-            case "encounter_diagnosis":
-            case "appointment":
-            case "condition": {
-                handlePatientEvent(event.getValues().getInteger("patient_id"), event);
-                break;
+        if (event.getOperation() == Operation.READ || event.getTimestamp() < snapshotTimestamp) {
+            if (log.isTraceEnabled()) {
+                log.trace("Skipping event: " + event);
             }
-            case "person":
-            case "person_name":
-            case "person_attribute":
-            case "person_address":
-            case "obs": {
-                handlePersonEvent(event.getValues().getInteger("person_id"), event);
-                break;
+            return;
+        }
+        // patient, patient_identifier, patient_program, visit, encounter, orders, order_group
+        // allergy, conditions, encounter_diagnosis, appointmentscheduling_appointment...
+        if (event.getValues().getInteger("patient_id") != null) {
+            handlePatientEvent(event.getValues().getInteger("patient_id"), event);
+        }
+        //  person, person_name, person_attribute, person_address, obs
+        else if (event.getValues().getInteger("person_id") != null) {
+            join(event, "person_id", "patient", "patient_id", false);
+        }
+        // relationship
+        else if (event.getTable().equals("relationship")) {
+            join(event, "person_a", "patient", "patient_id", false);
+            join(event, "person_b", "patient", "patient_id", false);
+        }
+        // patient_state, patient_program_attribute
+        else if (event.getValues().getInteger("patient_program_id") != null) {
+            join(event, "patient_program_id", "patient_program", "patient_program_id", true);
+        }
+        // visit_attribute
+        else if (event.getValues().getInteger("visit_id") != null) {
+            join(event, "visit_id", "visit", "visit_id", true);
+        }
+        // encounter_provider
+        else if (event.getValues().getInteger("encounter_id") != null) {
+            join(event, "encounter_id", "encounter", "encounter_id", true);
+        }
+        // allergy_reaction
+        else if (event.getValues().getInteger("allergy_id") != null) {
+            join(event, "allergy_id", "allergy", "allergy_id", true);
+        }
+        // test_order, drug_order, referral_order, order_attribute
+        else if (event.getValues().getInteger("order_id") != null) {
+            join(event, "order_id", "orders", "order_id", true);
+        }
+        else {
+            if (log.isTraceEnabled()) {
+                log.trace("Not logged as patient event: " + event);
             }
-            case "relationship": {
-                handlePersonEvent(event.getValues().getInteger("person_a"), event);
-                handlePersonEvent(event.getValues().getInteger("person_b"), event);
-                break;
+        }
+    }
+
+    /**
+     * Looks up the patient associated with the event and, if found, calls handlePatientEvent
+     */
+    protected void join(DbEvent event, String eventJoinColumn, String lookupTable, String lookupTableJoinColumn, boolean required) {
+        Integer eventJoinValue = event.getValues().getInteger(eventJoinColumn);
+        String rocksKey = lookupTable + "." + lookupTableJoinColumn + ":" + eventJoinValue;
+        Integer patientId = keysDb.get(rocksKey);
+        if (patientId == null) {
+            String sql = "select patient_id from " + lookupTable + " where " + lookupTableJoinColumn + " = " + eventJoinValue;
+            patientId = config.getContext().getDatabase().executeQuery(sql, new ScalarHandler<>(1));
+            if (patientId != null) {
+                keysDb.put(rocksKey, patientId);
             }
-            case "patient_state":
-            case "patient_program_attribute": {
-                handlePatientProgramEvent(event.getValues().getInteger("patient_program_id"), event);
-                break;
+            else if (required) {
+                throw new RuntimeException("Unable to find a value for " + rocksKey);
             }
-            case "visit_attribute": {
-                handleVisitEvent(event.getValues().getInteger("visit_id"), event);
-                break;
-            }
-            case "encounter_provider": {
-                handleEncounterEvent(event.getValues().getInteger("encounter_id"), event);
-                break;
-            }
-            case "allergy_reaction": {
-                handleAllergyEvent(event.getValues().getInteger("allergy_id"), event);
-                break;
-            }
-            case "test_order":
-            case "drug_order":
-            case "referral_order":
-            case "order_attribute":
-                handleOrderEvent(event.getValues().getInteger("order_id"), event);
-                break;
-            default: {
-                if (event.getValues().getInteger("patient_id") != null) {
-                    handlePatientEvent(event.getValues().getInteger("patient_id"), event);
-                }
-                else if (event.getValues().getInteger("person_id") != null) {
-                    handlePersonEvent(event.getValues().getInteger("person_id"), event);
-                }
-                else if (event.getValues().getInteger("patient_program_id") != null) {
-                    handlePatientProgramEvent(event.getValues().getInteger("patient_program_id"), event);
-                }
-                else if (event.getValues().getInteger("visit_id") != null) {
-                    handleVisitEvent(event.getValues().getInteger("visit_id"), event);
-                }
-                else if (event.getValues().getInteger("encounter_id") != null) {
-                    handleEncounterEvent(event.getValues().getInteger("encounter_id"), event);
-                }
-                else if (event.getValues().getInteger("allergy_id") != null) {
-                    handleAllergyEvent(event.getValues().getInteger("allergy_id"), event);
-                }
-                else if (event.getValues().getInteger("order_id") != null) {
-                    handleOrderEvent(event.getValues().getInteger("order_id"), event);
-                }
-                else {
-                    if (log.isTraceEnabled()) {
-                        log.trace("Not logged as patient event: " + event);
-                    }
+            else {
+                if (log.isTraceEnabled()) {
+                    log.trace("Not able to join " + event + " with patient, skipping");
                 }
             }
+        }
+        if (patientId != null) {
+            handlePatientEvent(patientId, event);
         }
     }
 
     public void handlePatientEvent(Integer patientId, DbEvent event) {
-        log.warn(++eventCount + " - " + event.getTable() + ": " + event.getKey());
-        PatientStatus patientStatus = new PatientStatus();
-        patientStatus.setPatientId(patientId);
-        if (event.getOperation() == Operation.READ) {
-            patientStatus.updateLastUpdatedIfLater(event.getValues().getLong("date_created"));
-            patientStatus.updateLastUpdatedIfLater(event.getValues().getLong("date_changed"));
-            patientStatus.updateLastUpdatedIfLater(event.getValues().getLong("date_voided"));
+        if (log.isDebugEnabled()) {
+            log.debug("Patient Event: " + patientId + " - " + event);
         }
-        else {
-            patientStatus.updateLastUpdatedIfLater(event.getTimestamp());
-        }
+        Timestamp lastUpdated = new Timestamp(event.getTimestamp());
+        String sql = "insert into dbevent_patient (patient_id, last_updated) values (?, ?) on duplicate key update last_updated = ?";
+        config.getContext().getDatabase().executeUpdate(sql, patientId, lastUpdated, lastUpdated);
         if (event.getTable().equals("patient")) {
             if (event.getOperation() == Operation.DELETE || event.getValues().getBoolean("voided")) {
-                patientStatus.setDeleted(true);
+                sql = "update dbevent_patient set deleted = true where patient_id = ? and deleted = false";
+                config.getContext().getDatabase().executeUpdate(sql, patientId);
+            }
+            else if (!event.getValues().getBoolean("voided")) {
+                sql = "update dbevent_patient set deleted = false where patient_id = ? and deleted = true";
+                config.getContext().getDatabase().executeUpdate(sql, patientId);
             }
         }
-        if (patientStatus.getLastUpdated() != null) {
-            Timestamp lastUpdated = new Timestamp(patientStatus.getLastUpdated());
-            boolean deleted = patientStatus.isDeleted();
-
-            Object[] savedStatus = patientStatusMap.get(patientId);
-            if (savedStatus == null || !savedStatus[0].equals(lastUpdated) || !savedStatus[1].equals(deleted)) {
-                patientStatusMap.put(patientId, new Object[]{lastUpdated, deleted});
-                executeUpdate(
-                        "insert into dbevent_patient (patient_id, last_updated, deleted) values (?, ?, ?) on duplicate key update last_updated = ?, deleted = ?",
-                        patientId, lastUpdated, deleted, lastUpdated, deleted
-                );
-            }
-        }
-        else {
-            log.warn("Skipping event with no last updated date: " + event);
-        }
     }
 
-    public void handlePersonEvent(Integer personId, DbEvent event) {
-        log.debug("Person " + personId + ": " + event);
-        try {
-            Integer patientId = getValue("patient_id", "patient", "patient_id", personId);
-            handlePatientEvent(patientId, event);
-        }
-        catch (Exception e) {
-            log.trace("No patient found for person: " + personId);
-        }
-    }
-
-    public void handlePatientProgramEvent(Integer patientProgramId, DbEvent event) {
-        log.debug("Patient Program " + patientProgramId + ": " + event);
-        Integer patientId = getValue("patient_id", "patient_program", "patient_program_id", patientProgramId);
-        handlePatientEvent(patientId, event);
-    }
-
-    public void handleVisitEvent(Integer visitId, DbEvent event) {
-        log.debug("Visit " + visitId + ": " + event);
-        Integer patientId = getValue("patient_id", "visit", "visit_id", visitId);
-        handlePatientEvent(patientId, event);
-    }
-
-    public void handleEncounterEvent(Integer encounterId, DbEvent event) {
-        log.debug("Encounter " + encounterId + ": " + event);
-        Integer patientId = getValue("patient_id", "encounter", "encounter_id", encounterId);
-        handlePatientEvent(patientId, event);
-    }
-
-    public void handleAllergyEvent(Integer allergyId, DbEvent event) {
-        log.debug("Allergy " + allergyId + ": " + event);
-        Integer patientId = getValue("patient_id", "allergy", "allergy_id", allergyId);
-        handlePatientEvent(patientId, event);
-    }
-
-    public void handleOrderEvent(Integer orderId, DbEvent event) {
-        log.debug("Order " + orderId + ": " + event);
-        Integer patientId = getValue("patient_id", "orders", "order_id", orderId);
-        handlePatientEvent(patientId, event);
-    }
-
-    private Integer getValue(String valCol, String table, String keyCol, Integer keyVal) {
-        String rocksKey = table + "." + keyCol + ":" + keyVal;
-        Integer val = keyMap.get(rocksKey);
-        if (val == null) {
-            String sql = "select " + valCol + " from " + table + " where " + keyCol + " = " + keyVal;
-            try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        if (val != null) {
-                            throw new RuntimeException("More than one value found for " + rocksKey);
-                        }
-                        val = rs.getInt(1);
+    /**
+     * Rather than stream all initial READ events one by one, it is much more efficient to set up the initial state
+     * by querying the database directly to record the most recent date updated and deleted status for all patients.
+     * This
+     */
+    protected void performInitialSnapshot() {
+        config.getContext().getDatabase().executeUpdate(
+                "insert ignore into dbevent_patient (patient_id, last_updated, deleted) " +
+                        "select patient_id, greatest(date_created, ifnull(date_changed, date_created), ifnull(date_voided, date_created)), voided from patient"
+        );
+        DatabaseMetadata metadata = config.getContext().getDatabase().getMetadata();
+        for (DatabaseTable table : metadata.getTables().values()) {
+            if (config.isIncluded(table) && !table.getTableName().equals("patient")) {
+                Set<String> columns = table.getColumns().keySet();
+                List<String> joinCols = new ArrayList<>();
+                if (columns.contains("patient_id")) {
+                    joinCols.add("patient_id");
+                } else if (columns.contains("person_id")) {
+                    joinCols.add("person_id");
+                } else if (table.getTableName().equals("relationship")) {
+                    joinCols.add("person_a");
+                    joinCols.add("person_b");
+                }
+                List<String> dateCols = new ArrayList<>();
+                if (columns.contains("date_created")) {
+                    dateCols.add("ifnull(x.date_created, p.last_updated)");
+                }
+                if (columns.contains("date_changed")) {
+                    dateCols.add("ifnull(x.date_changed, p.last_updated)");
+                }
+                if (columns.contains("date_voided")) {
+                    dateCols.add("ifnull(x.date_voided, p.last_updated)");
+                }
+                if (!joinCols.isEmpty() && !dateCols.isEmpty()) {
+                    for (String joinCol : joinCols) {
+                        config.getContext().getDatabase().executeUpdate("update dbevent_patient p " +
+                                "inner join " + table.getTableName() + " x on p.patient_id = x." + joinCol + " " +
+                                "set p.last_updated = greatest(p.last_updated, " + String.join(",", dateCols) + ")"
+                        );
                     }
                 }
             }
-            catch (Exception e) {
-                throw new RuntimeException("Error executing SQL", e);
-            }
-            if (val != null) {
-                keyMap.put(rocksKey, val);
-            }
-            else {
-                throw new RuntimeException("Unable to find a value for " + rocksKey);
-            }
-        }
-        return val;
-    }
-
-    private void executeUpdate(String statement, Object... values) {
-        log.warn("Updating: " + Arrays.asList(values));
-        try (PreparedStatement insertStmt = connection.prepareStatement(statement)) {
-            for (int i=0; i<values.length; i++) {
-                insertStmt.setObject(i+1, values[i]);
-            }
-            insertStmt.execute();
-        }
-        catch (Exception e) {
-            throw new RuntimeException("An error occurred updating executing update", e);
         }
     }
 }

@@ -32,5 +32,4 @@ public class DbEventModuleActivatorTest extends BaseDbEventTest {
 		activator.stopped();
 		assertLastLogContains("DB Event Module Stopped");
 	}
-
 }

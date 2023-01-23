@@ -10,7 +10,7 @@ public interface EventConsumer extends Consumer<DbEvent> {
     /**
      * Any logic that should be executed at startup (prior to any Event processing) can be implemented here
      */
-    default void startup(DbEventSourceConfig eventSourceConfig) {}
+    default void startup() {}
 
     /**
      * Any logic that should be executed at shutdown can be implemented here.

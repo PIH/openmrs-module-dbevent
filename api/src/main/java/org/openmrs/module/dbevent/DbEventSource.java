@@ -57,7 +57,7 @@ public class DbEventSource {
         }
 
         log.info("Starting event consumer: " + eventConsumer);
-        eventConsumer.startup(config);
+        eventConsumer.startup();
 
         engine = DebeziumEngine.create(Connect.class)
                 .using(config.getConfig())

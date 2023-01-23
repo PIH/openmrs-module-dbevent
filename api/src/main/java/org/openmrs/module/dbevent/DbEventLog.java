@@ -83,8 +83,8 @@ public class DbEventLog {
 	}
 
 	public static List<String> getMonitoringBeanAttributeNames(String sourceName) {
+		List<String> ret = new ArrayList<>();
 		try {
-			List<String> ret = new ArrayList<>();
 			MBeanInfo beanInfo = getMonitoringBean(sourceName);
 			for (MBeanAttributeInfo attribute : beanInfo.getAttributes()) {
 				ret.add(attribute.getName());
@@ -92,8 +92,9 @@ public class DbEventLog {
 			return ret;
 		}
 		catch (Exception e) {
-			throw new RuntimeException(e);
+			log.warn("Error getting monitoring mean attribute names", e);
 		}
+		return ret;
 	}
 
 	public static Object getMonitoringBeanAttribute(String sourceName, String att) {
