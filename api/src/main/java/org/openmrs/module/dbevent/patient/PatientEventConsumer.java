@@ -13,12 +13,18 @@ import org.openmrs.module.dbevent.Rocks;
 
 import java.io.File;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
  * Consumes patient-related events
+ * For performance reasons on larger databases, this does not use a Debezium-generated snapshot, but rather
+ * computes a custom snapshot that is then updated as needed from change events.
+ * When used, this should be configured with "snapshot.mode = schema_only"
  */
 public class PatientEventConsumer implements EventConsumer {
 
@@ -27,7 +33,7 @@ public class PatientEventConsumer implements EventConsumer {
     private final DbEventSourceConfig config;
     private Rocks keysDb;
     private Rocks statusDb;
-    private Long snapshotTimestamp = null;
+    private Long maxEventTimestamp = null;
 
     public PatientEventConsumer(DbEventSourceConfig config) {
         this.config = config;
@@ -38,13 +44,14 @@ public class PatientEventConsumer implements EventConsumer {
         try {
             keysDb = new Rocks(new File(config.getContext().getModuleDataDir(), "keys.db"));
             statusDb = new Rocks(new File(config.getContext().getModuleDataDir(), "status.db"));
-            snapshotTimestamp = statusDb.get("snapshotTimestamp");
+            Long snapshotTimestamp = statusDb.get("snapshotTimestamp");
             if (snapshotTimestamp == null) {
                 long timestamp = System.currentTimeMillis();
                 performInitialSnapshot();
                 snapshotTimestamp = timestamp;
                 statusDb.put("snapshotTimestamp", snapshotTimestamp);
             }
+            maxEventTimestamp = getMaxEventTimestamp();
         }
         catch (Exception e) {
             throw new RuntimeException("An error occurred starting up", e);
@@ -54,17 +61,17 @@ public class PatientEventConsumer implements EventConsumer {
     @Override
     public void shutdown() {
         keysDb.close();
-        statusDb.close();
     }
 
     @Override
     public void accept(DbEvent event) {
-        if (event.getOperation() == Operation.READ || event.getTimestamp() < snapshotTimestamp) {
+        if (maxEventTimestamp != null && event.getTimestamp() < maxEventTimestamp) {
             if (log.isTraceEnabled()) {
-                log.trace("Skipping event: " + event);
+                log.trace("Skipping event prior to " + maxEventTimestamp + ": " + event);
             }
             return;
         }
+
         // patient, patient_identifier, patient_program, visit, encounter, orders, order_group
         // allergy, conditions, encounter_diagnosis, appointmentscheduling_appointment...
         if (event.getValues().getInteger("patient_id") != null) {
@@ -98,8 +105,7 @@ public class PatientEventConsumer implements EventConsumer {
         // test_order, drug_order, referral_order, order_attribute
         else if (event.getValues().getInteger("order_id") != null) {
             join(event, "order_id", "orders", "order_id", true);
-        }
-        else {
+        } else {
             if (log.isTraceEnabled()) {
                 log.trace("Not logged as patient event: " + event);
             }
@@ -133,6 +139,11 @@ public class PatientEventConsumer implements EventConsumer {
         }
     }
 
+    /**
+     * Once a particular event is connected ot a particular patient, this tracks this change for the patient
+     * @param patientId the patient id related to the event
+     * @param event the event to track
+     */
     public void handlePatientEvent(Integer patientId, DbEvent event) {
         if (log.isDebugEnabled()) {
             log.debug("Patient Event: " + patientId + " - " + event);
@@ -150,12 +161,13 @@ public class PatientEventConsumer implements EventConsumer {
                 config.getContext().getDatabase().executeUpdate(sql, patientId);
             }
         }
+        maxEventTimestamp = event.getTimestamp();
     }
 
     /**
      * Rather than stream all initial READ events one by one, it is much more efficient to set up the initial state
      * by querying the database directly to record the most recent date updated and deleted status for all patients.
-     * This
+     * This method performs this operation, and returns the max last_updated in the database
      */
     protected void performInitialSnapshot() {
         config.getContext().getDatabase().executeUpdate(
@@ -164,16 +176,32 @@ public class PatientEventConsumer implements EventConsumer {
         );
         DatabaseMetadata metadata = config.getContext().getDatabase().getMetadata();
         for (DatabaseTable table : metadata.getTables().values()) {
-            if (config.isIncluded(table) && !table.getTableName().equals("patient")) {
+            String tableName = table.getTableName();
+            if (config.isIncluded(table) && !tableName.equals("patient")) {
                 Set<String> columns = table.getColumns().keySet();
-                List<String> joinCols = new ArrayList<>();
+                List<String> joins = new ArrayList<>();
                 if (columns.contains("patient_id")) {
-                    joinCols.add("patient_id");
+                    joins.add("inner join " + tableName + " x on p.patient_id = x.patient_id");
                 } else if (columns.contains("person_id")) {
-                    joinCols.add("person_id");
+                    joins.add("inner join " + tableName + " x on p.patient_id = x.person_id");
                 } else if (table.getTableName().equals("relationship")) {
-                    joinCols.add("person_a");
-                    joinCols.add("person_b");
+                    joins.add("inner join relationship x on p.patient_id = x.person_a");
+                    joins.add("inner join relationship x on p.patient_id = x.person_b");
+                }
+                else if (columns.contains("patient_program_id")) {
+                    joins.add("inner join patient_program pp on p.patient_id = pp.patient_id inner join " + tableName + " x on x.patient_program_id = pp.patient_program_id");
+                }
+                else if (columns.contains("visit_id")) {
+                    joins.add("inner join visit v on p.patient_id = v.patient_id inner join " + tableName + " x on x.visit_id = v.visit_id");
+                }
+                else if (columns.contains("encounter_id")) {
+                    joins.add("inner join encounter e on p.patient_id = e.patient_id inner join " + tableName + " x on x.encounter_id = e.encounter_id");
+                }
+                else if (columns.contains("allergy_id")) {
+                    joins.add("inner join allergy a on p.patient_id = a.patient_id inner join " + tableName + " x on x.allergy_id = a.allergy_id");
+                }
+                else if (columns.contains("order_id")) {
+                    joins.add("inner join orders o on p.patient_id = o.patient_id inner join " + tableName + " x on x.order_id = o.order_id");
                 }
                 List<String> dateCols = new ArrayList<>();
                 if (columns.contains("date_created")) {
@@ -185,15 +213,21 @@ public class PatientEventConsumer implements EventConsumer {
                 if (columns.contains("date_voided")) {
                     dateCols.add("ifnull(x.date_voided, p.last_updated)");
                 }
-                if (!joinCols.isEmpty() && !dateCols.isEmpty()) {
-                    for (String joinCol : joinCols) {
-                        config.getContext().getDatabase().executeUpdate("update dbevent_patient p " +
-                                "inner join " + table.getTableName() + " x on p.patient_id = x." + joinCol + " " +
+                if (!joins.isEmpty() && !dateCols.isEmpty()) {
+                    for (String join : joins) {
+                        config.getContext().getDatabase().executeUpdate("update dbevent_patient p " + join + " " +
                                 "set p.last_updated = greatest(p.last_updated, " + String.join(",", dateCols) + ")"
                         );
                     }
                 }
             }
         }
+    }
+
+    protected Long getMaxEventTimestamp() {
+        LocalDateTime datetime = config.getContext().getDatabase().executeQuery(
+                "select max(last_updated) from dbevent_patient", new ScalarHandler<>(1)
+        );
+        return (datetime == null ? null : ZonedDateTime.of(datetime, ZoneId.systemDefault()).toInstant().toEpochMilli());
     }
 }
