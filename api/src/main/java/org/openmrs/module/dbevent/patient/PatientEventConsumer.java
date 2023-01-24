@@ -61,6 +61,7 @@ public class PatientEventConsumer implements EventConsumer {
     @Override
     public void shutdown() {
         keysDb.close();
+        statusDb.close();
     }
 
     @Override
