@@ -24,22 +24,22 @@ public class DatabaseMetadata implements Serializable {
         tables.put(table.getTableName(), table);
     }
 
-    public Set<String> getAllTablesWithReferences(String tableName, String... excludedTables) {
-        Set<String> ret = new HashSet<>(tables.get(tableName).getTablesWithReferences());
+    public Set<String> getAllTablesReferencedBy(String tableName, String... excludedTables) {
+        Set<String> ret = new HashSet<>(tables.get(tableName).getTablesReferencedBy());
         Arrays.asList(excludedTables).forEach(ret::remove);
         List<String> nestedTables = new ArrayList<>(ret);
         for (String nestedTable : nestedTables) {
             List<String> nestedExclusions = new ArrayList<>(Arrays.asList(excludedTables));
             nestedExclusions.addAll(ret);
-            ret.addAll(getAllTablesWithReferences(nestedTable, nestedExclusions.toArray(new String[0])));
+            ret.addAll(getAllTablesReferencedBy(nestedTable, nestedExclusions.toArray(new String[0])));
         }
         return ret;
     }
 
     public Set<String> getPatientTableNames() {
         Set<String> ret = new TreeSet<>();
-        ret.addAll(getAllTablesWithReferences("patient"));
-        ret.addAll(getAllTablesWithReferences("person", "users", "provider"));
+        ret.addAll(getAllTablesReferencedBy("patient"));
+        ret.addAll(getAllTablesReferencedBy("person", "users", "provider"));
         return ret;
     }
 
@@ -49,8 +49,11 @@ public class DatabaseMetadata implements Serializable {
             System.out.println("TABLE: " + table.getTableName());
             for (DatabaseColumn column : table.getColumns().values()) {
                 System.out.println(" " + column.getColumnName() + (column.isPrimaryKey() ? " PRIMARY KEY" : ""));
-                for (DatabaseColumn fkColumn : column.getExternalReferences()) {
+                for (DatabaseColumn fkColumn : column.getReferences()) {
                     System.out.println("   => " + fkColumn.getTableName() + "." + fkColumn.getColumnName());
+                }
+                for (DatabaseColumn fkColumn : column.getReferencedBy()) {
+                    System.out.println("   <= " + fkColumn.getTableName() + "." + fkColumn.getColumnName());
                 }
             }
         }

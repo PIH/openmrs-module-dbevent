@@ -50,7 +50,8 @@ public class DatabaseTest {
             DatabaseColumn visitIdColumn = visitTable.getColumns().get("visit_id");
             assertNotNull(visitIdColumn);
             assertTrue(visitIdColumn.isPrimaryKey());
-            assertThat(visitIdColumn.getExternalReferences().size(), equalTo(3));
+            assertThat(visitIdColumn.getReferencedBy().size(), equalTo(3));
+            metadata.print();
         }
     }
 }

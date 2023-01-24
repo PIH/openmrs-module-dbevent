@@ -26,10 +26,10 @@ public class DatabaseTable implements Serializable {
         columns.put(column.getColumnName(), column);
     }
 
-    public Set<String> getTablesWithReferences() {
+    public Set<String> getTablesReferencedBy() {
         Set<String> ret = new HashSet<>();
         for (DatabaseColumn column : columns.values()) {
-            for (DatabaseColumn dependentColumn : column.getExternalReferences()) {
+            for (DatabaseColumn dependentColumn : column.getReferencedBy()) {
                 ret.add(dependentColumn.getTableName());
             }
         }

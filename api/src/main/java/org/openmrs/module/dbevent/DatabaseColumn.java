@@ -1,6 +1,7 @@
 package org.openmrs.module.dbevent;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.util.HashSet;
@@ -15,7 +16,8 @@ public class DatabaseColumn implements Serializable {
     private String tableName;
     private String columnName;
     private boolean primaryKey;
-    private Set<DatabaseColumn> externalReferences = new HashSet<>();
+    @EqualsAndHashCode.Exclude private Set<DatabaseColumn> referencedBy = new HashSet<>();
+    @EqualsAndHashCode.Exclude private Set<DatabaseColumn> references = new HashSet<>();
 
     public DatabaseColumn(String databaseName, String tableName, String columnName) {
         this.databaseName = databaseName;

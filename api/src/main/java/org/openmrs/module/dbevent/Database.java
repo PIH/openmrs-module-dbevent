@@ -93,16 +93,22 @@ public class Database implements Serializable {
                             table.getColumns().get(columnName).setPrimaryKey(true);
                         }
                     }
-                    try (ResultSet fkRs = connection.getMetaData().getExportedKeys(databaseName, null, tableName)) {
-                        while (fkRs.next()) {
-                            String fkTableName = fkRs.getString("FKTABLE_NAME");
-                            String fkColumnName = fkRs.getString("FKCOLUMN_NAME");
-                            DatabaseColumn fkColumn = new DatabaseColumn(databaseName, fkTableName, fkColumnName);
-                            String pkColumnName = fkRs.getString("PKCOLUMN_NAME");
-                            table.getColumns().get(pkColumnName).getExternalReferences().add(fkColumn);
-                        }
-                    }
                     ret.addTable(table);
+                }
+            }
+            for (DatabaseTable table : ret.getTables().values()) {
+                String tableName = table.getTableName();
+                try (ResultSet fkRs = connection.getMetaData().getExportedKeys(databaseName, null, tableName)) {
+                    while (fkRs.next()) {
+                        String fkTableName = fkRs.getString("FKTABLE_NAME").toLowerCase();
+                        String fkColumnName = fkRs.getString("FKCOLUMN_NAME").toLowerCase();
+                        String pkColumnName = fkRs.getString("PKCOLUMN_NAME").toLowerCase();
+                        DatabaseColumn pkColumn = table.getColumns().get(pkColumnName);
+                        DatabaseTable fkTable = ret.getTables().get(fkTableName);
+                        DatabaseColumn fkColumn = fkTable.getColumns().get(fkColumnName);
+                        pkColumn.getReferencedBy().add(fkColumn);
+                        fkColumn.getReferences().add(pkColumn);
+                    }
                 }
             }
         }
@@ -133,7 +139,7 @@ public class Database implements Serializable {
      * @param values the values for each parameter in the statement
      */
     public void executeUpdate(String sql, Object... values) {
-        log.warn(sql + " " + Arrays.asList(values));
+        log.debug(sql + " " + Arrays.asList(values));
         try (Connection conn = openConnection(); ) {
             QueryRunner qr = new QueryRunner();
             qr.execute(conn, sql, values);
