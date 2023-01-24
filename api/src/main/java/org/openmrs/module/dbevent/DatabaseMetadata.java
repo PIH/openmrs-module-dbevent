@@ -44,19 +44,20 @@ public class DatabaseMetadata implements Serializable {
         return ret;
     }
 
-    public List<DatabaseJoin> getJoins(String fromTableName, String toTableName, boolean includeNullableColumns) {
-        return getJoins(fromTableName, toTableName, includeNullableColumns, new HashSet<>());
-    }
-
-    private List<DatabaseJoin> getJoins(String fromTableName, String toTableName, boolean includeNullableColumns, Set<String> seenTables) {
+    public List<DatabaseJoin> getJoins(String fromTableName, String toTableName, boolean includeNullableColumns, String... excludedTables) {
         List<DatabaseJoin> ret = new ArrayList<>();
-        if (!seenTables.contains(fromTableName)) {
-            seenTables.add(fromTableName);
+        List<String> exclusions = new ArrayList<>(Arrays.asList(excludedTables));
+        if (!exclusions.contains(fromTableName)) {
+            exclusions.add(fromTableName);
             DatabaseTable fromTable = getTables().get(fromTableName);
             for (DatabaseColumn fromColumn : fromTable.getColumns().values()) {
                 for (DatabaseColumn toColumn : fromColumn.getReferences()) {
-                    if (toColumn.getTableName().equals(toTableName) && (includeNullableColumns || !toColumn.isNullable())) {
-                        ret.add(new DatabaseJoin(fromColumn, toColumn));
+                    if (toColumn.getTableName().equals(toTableName)) {
+                        if (includeNullableColumns || !toColumn.isNullable()) {
+                            if (!exclusions.contains(toColumn.getTableName())) {
+                                ret.add(new DatabaseJoin(fromColumn, toColumn));
+                            }
+                        }
                     }
                 }
             }
@@ -64,8 +65,9 @@ public class DatabaseMetadata implements Serializable {
                 for (DatabaseColumn c : fromTable.getColumns().values()) {
                     if (!c.getReferences().isEmpty() && (includeNullableColumns || !c.isNullable())) {
                         for (DatabaseColumn refColumn : c.getReferences()) {
-                            if (!seenTables.contains(refColumn.getTableName())) {
-                                List<DatabaseJoin> refs = getJoins(refColumn.getTableName(), toTableName, includeNullableColumns, seenTables);
+                            if (!exclusions.contains(refColumn.getTableName())) {
+                                excludedTables = exclusions.toArray(new String[0]);
+                                List<DatabaseJoin> refs = getJoins(refColumn.getTableName(), toTableName, includeNullableColumns, excludedTables);
                                 if (!refs.isEmpty()) {
                                     refs.add(0, new DatabaseJoin(c, refColumn));
                                     if (ret.isEmpty() || refs.size() < ret.size()) {

@@ -29,8 +29,12 @@ public class DatabaseColumn implements Serializable {
         this.nullable = nullable;
     }
 
+    public String getTableAndColumn() {
+        return tableName + "." + columnName;
+    }
+
     @Override
     public String toString() {
-        return tableName + "." + columnName;
+        return getTableAndColumn();
     }
 }

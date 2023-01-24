@@ -79,4 +79,18 @@ public class DbEventSourceTest {
             }
         }
     }
+
+    @Test
+    public void shouldGetPatientIdQueries() throws Exception {
+        try (Mysql mysql = Mysql.open()) {
+            EventContext ctx = new TestEventContext(mysql);
+            DbEventSourceConfig config = new DbEventSourceConfig(100002,"EventLogger", ctx);
+            config.configureTablesToInclude(ctx.getDatabase().getMetadata().getPatientTableNames());
+            PatientEventConsumer patientEventConsumer = new PatientEventConsumer(config);
+            Map<String, PatientEventConsumer.PatientIdQuery> m = patientEventConsumer.getPatientIdQueries();
+            for (String table : m.keySet()) {
+                System.out.println(table + ": " + m.get(table));
+            }
+        }
+    }
 }
