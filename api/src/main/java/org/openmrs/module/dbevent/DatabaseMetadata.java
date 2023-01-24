@@ -17,6 +17,7 @@ import java.util.TreeSet;
  */
 @Data
 public class DatabaseMetadata implements Serializable {
+
     private String databaseName;
     private Map<String, DatabaseTable> tables = new LinkedHashMap<>();
 
@@ -43,6 +44,43 @@ public class DatabaseMetadata implements Serializable {
         return ret;
     }
 
+    public List<DatabaseJoin> getJoins(String fromTableName, String toTableName, boolean includeNullableColumns) {
+        return getJoins(fromTableName, toTableName, includeNullableColumns, new HashSet<>());
+    }
+
+    private List<DatabaseJoin> getJoins(String fromTableName, String toTableName, boolean includeNullableColumns, Set<String> seenTables) {
+        List<DatabaseJoin> ret = new ArrayList<>();
+        if (!seenTables.contains(fromTableName)) {
+            seenTables.add(fromTableName);
+            DatabaseTable fromTable = getTables().get(fromTableName);
+            for (DatabaseColumn fromColumn : fromTable.getColumns().values()) {
+                for (DatabaseColumn toColumn : fromColumn.getReferences()) {
+                    if (toColumn.getTableName().equals(toTableName) && (includeNullableColumns || !toColumn.isNullable())) {
+                        ret.add(new DatabaseJoin(fromColumn, toColumn));
+                    }
+                }
+            }
+            if (ret.isEmpty()) {
+                for (DatabaseColumn c : fromTable.getColumns().values()) {
+                    if (!c.getReferences().isEmpty() && (includeNullableColumns || !c.isNullable())) {
+                        for (DatabaseColumn refColumn : c.getReferences()) {
+                            if (!seenTables.contains(refColumn.getTableName())) {
+                                List<DatabaseJoin> refs = getJoins(refColumn.getTableName(), toTableName, includeNullableColumns, seenTables);
+                                if (!refs.isEmpty()) {
+                                    refs.add(0, new DatabaseJoin(c, refColumn));
+                                    if (ret.isEmpty() || refs.size() < ret.size()) {
+                                        ret = refs;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return ret;
+    }
+
     public void print() {
         for (DatabaseTable table : getTables().values()) {
             System.out.println("=======================");
@@ -57,5 +95,14 @@ public class DatabaseMetadata implements Serializable {
                 }
             }
         }
+    }
+
+    public DatabaseTable getTable(String tableName) {
+        return getTables().get(tableName);
+    }
+
+    public DatabaseColumn getColumn(String tableName, String columnName) {
+        DatabaseTable table = getTable(tableName);
+        return table == null ? null : table.getColumns().get(columnName);
     }
 }

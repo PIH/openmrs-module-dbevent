@@ -84,7 +84,8 @@ public class Database implements Serializable {
                     try (ResultSet columnRs = connection.getMetaData().getColumns(databaseName, null, tableName, "%")) {
                         while (columnRs.next()) {
                             String columnName = columnRs.getString("COLUMN_NAME").toLowerCase();
-                            table.addColumn(new DatabaseColumn(databaseName, tableName, columnName));
+                            boolean nullable = "YES".equals(columnRs.getString("IS_NULLABLE"));
+                            table.addColumn(new DatabaseColumn(databaseName, tableName, columnName, nullable));
                         }
                     }
                     try (ResultSet pkRs = connection.getMetaData().getPrimaryKeys(databaseName, null , tableName)) {
