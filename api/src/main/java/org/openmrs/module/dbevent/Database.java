@@ -77,16 +77,32 @@ public class Database implements Serializable {
         DatabaseMetadata ret = new DatabaseMetadata();
         ret.setDatabaseName(databaseName);
         try (Connection connection = openConnection();) {
-            try (ResultSet rs = connection.getMetaData().getColumns(databaseName, null, "%", "%")) {
-                while (rs.next()) {
-                    String tableName = rs.getString("TABLE_NAME").toLowerCase();
-                    String columnName = rs.getString("COLUMN_NAME").toLowerCase();
-                    DatabaseTable table = ret.getTables().get(tableName);
-                    if (table == null) {
-                        table = new DatabaseTable(databaseName, tableName);
-                        ret.addTable(table);
+            try (ResultSet tableRs = connection.getMetaData().getTables(databaseName, null, "%", new String[] { "TABLE" })) {
+                while (tableRs.next()) {
+                    String tableName = tableRs.getString("TABLE_NAME").toLowerCase();
+                    DatabaseTable table = new DatabaseTable(databaseName, tableName);
+                    try (ResultSet columnRs = connection.getMetaData().getColumns(databaseName, null, tableName, "%")) {
+                        while (columnRs.next()) {
+                            String columnName = columnRs.getString("COLUMN_NAME").toLowerCase();
+                            table.addColumn(new DatabaseColumn(databaseName, tableName, columnName));
+                        }
                     }
-                    table.addColumn(new DatabaseColumn(databaseName, tableName, columnName));
+                    try (ResultSet pkRs = connection.getMetaData().getPrimaryKeys(databaseName, null , tableName)) {
+                        while (pkRs.next()) {
+                            String columnName = pkRs.getString("COLUMN_NAME").toLowerCase();
+                            table.getColumns().get(columnName).setPrimaryKey(true);
+                        }
+                    }
+                    try (ResultSet fkRs = connection.getMetaData().getExportedKeys(databaseName, null, tableName)) {
+                        while (fkRs.next()) {
+                            String fkTableName = fkRs.getString("FKTABLE_NAME");
+                            String fkColumnName = fkRs.getString("FKCOLUMN_NAME");
+                            DatabaseColumn fkColumn = new DatabaseColumn(databaseName, fkTableName, fkColumnName);
+                            String pkColumnName = fkRs.getString("PKCOLUMN_NAME");
+                            table.getColumns().get(pkColumnName).getExternalReferences().add(fkColumn);
+                        }
+                    }
+                    ret.addTable(table);
                 }
             }
         }
@@ -138,5 +154,10 @@ public class Database implements Serializable {
         catch (Exception e) {
             log.warn("An error occurred closing the database connection", e);
         }
+    }
+
+    @Override
+    public String toString() {
+        return url;
     }
 }

@@ -7,7 +7,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -70,10 +70,10 @@ public class DbEventSourceConfig {
      * Provides a mechanism to add tables to include
      * @param tables the list of tables to include.  If not prefixed with a database name, it will be added
      */
-    public void configureTablesToInclude(String... tables) {
-        if (tables != null && tables.length > 0) {
+    public void configureTablesToInclude(Collection<String> tables) {
+        if (tables != null && tables.size() > 0) {
             String tablePrefix = StringUtils.isNotBlank(getDatabaseName()) ? getDatabaseName() + "." : "";
-            String tableConfig = Arrays.stream(tables)
+            String tableConfig = tables.stream()
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
             config.setProperty("table.include.list", tableConfig);
@@ -81,9 +81,9 @@ public class DbEventSourceConfig {
     }
 
     /**
-     * @return the configured tables to include, or an empty list if not configured
+     * @return the configured table.include.list patterns
      */
-    public List<String> getTablesToInclude() {
+    public List<String> getIncludedTablePatterns() {
         List<String> ret = new ArrayList<>();
         String val = config.getProperty("table.include.list");
         if (val != null) {
@@ -98,10 +98,10 @@ public class DbEventSourceConfig {
      * Provides a mechanism to add tables to exclude
      * @param tables the list of tables to exclude.  If not prefixed with a database name, it will be added
      */
-    public void configureTablesToExclude(String... tables) {
-        if (tables != null && tables.length > 0) {
+    public void configureTablesToExclude(Collection<String> tables) {
+        if (tables != null && tables.size() > 0) {
             String tablePrefix = StringUtils.isNotBlank(getDatabaseName()) ? getDatabaseName() + "." : "";
-            String tableConfig = Arrays.stream(tables)
+            String tableConfig = tables.stream()
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
             config.setProperty("table.exclude.list", tableConfig);
@@ -109,9 +109,9 @@ public class DbEventSourceConfig {
     }
 
     /**
-     * @return the configured tables to exclude, or an empty list if not configured
+     * @return the configured table.exclude.list patterns
      */
-    public List<String> getTablesToExclude() {
+    public List<String> getExcludedTablePatterns() {
         List<String> ret = new ArrayList<>();
         String val = config.getProperty("table.exclude.list");
         if (val != null) {
@@ -128,9 +128,39 @@ public class DbEventSourceConfig {
      */
     public boolean isIncluded(DatabaseTable table) {
         String name = table.getDatabaseName() + "." + table.getTableName();
-        List<String> tablesToInclude = getTablesToInclude();
-        List<String> tablesToExclude = getTablesToExclude();
-        return (tablesToInclude.isEmpty() || tablesToInclude.contains(name)) && !tablesToExclude.contains(name);
+        List<String> includePatterns = getIncludedTablePatterns();
+        if (!includePatterns.isEmpty()) {
+            for (String pattern : includePatterns) {
+                if (name.matches(pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else {
+            List<String> excludePatterns = getExcludedTablePatterns();
+            if (!excludePatterns.isEmpty()) {
+                for (String pattern : excludePatterns) {
+                    if (name.matches(pattern)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+
+    /**
+     * @return all tables in the database that are included based on the included and excluded table configuration
+     */
+    public List<DatabaseTable> getMonitoredTables() {
+        List<DatabaseTable> ret = new ArrayList<>();
+        for (DatabaseTable table : context.getDatabase().getMetadata().getTables().values()) {
+            if (isIncluded(table)) {
+                ret.add(table);
+            }
+        }
+        return ret;
     }
 
     /**

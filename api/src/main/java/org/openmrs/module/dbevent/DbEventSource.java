@@ -46,8 +46,9 @@ public class DbEventSource {
      * Starts up the event source to stream events from the database and consume by the registered consumer
      */
     public void start() {
-        log.info("Starting Event Source: " + config.getSourceId());
-        log.debug("Configuration: " + config);
+        log.info("Starting Event Source: " + config.getSourceId() + " - " + config.getSourceName());
+        log.warn(config.getSourceName() + " - monitoring tables: " + config.getMonitoredTables());
+        log.debug(config.getSourceName() + " - configuration: " + config);
 
         if (config.getOffsetsFile().getParentFile().mkdirs()) {
             log.info("Created directory: " + config.getOffsetsFile().getParentFile());

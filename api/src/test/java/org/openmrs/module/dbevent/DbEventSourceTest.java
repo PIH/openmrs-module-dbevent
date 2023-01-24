@@ -54,15 +54,7 @@ public class DbEventSourceTest {
             Database db = ctx.getDatabase();
             db.executeUpdate("create table dbevent_patient (patient_id int primary key, last_updated datetime, deleted boolean)");
             DbEventSourceConfig config = new DbEventSourceConfig(100002,"EventLogger", ctx);
-            config.configureTablesToInclude(
-                    "patient", "patient_identifier",
-                    "patient_program", "patient_state", "patient_program_attribute",
-                    "person", "person_name", "person_address", "person_attribute", "relationship",
-                    "visit", "visit_attribute",
-                    "encounter", "encounter_provider", "encounter_diagnosis",
-                    "obs", "allergy", "allergy_reaction", "conditions",
-                    "orders", "order_group", "test_order", "drug_order", "referral_order", "order_attribute"
-            );
+            config.configureTablesToInclude(ctx.getDatabase().getMetadata().getPatientTableNames());
             DbEventSource eventSource = new DbEventSource(config);
             eventSource.setEventConsumer(new PatientEventConsumer(config));
             try {

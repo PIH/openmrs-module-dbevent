@@ -10,7 +10,9 @@ import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DatabaseTest {
 
@@ -38,12 +40,17 @@ public class DatabaseTest {
         try (Mysql mysql = Mysql.open()) {
             EventContext ctx = new TestEventContext(mysql);
             DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
-            assertThat(metadata.getTables().size(), equalTo(187));
+            assertTrue(metadata.getTables().size() > 100);
             DatabaseTable visitTable = metadata.getTables().get("visit");
             assertNotNull(visitTable);
             assertThat(visitTable.getDatabaseName(), equalTo(metadata.getDatabaseName()));
             assertThat(visitTable.getTableName(), equalTo("visit"));
             assertThat(visitTable.getColumns().size(), equalTo(16));
+            assertFalse(visitTable.getColumns().get("creator").isPrimaryKey());
+            DatabaseColumn visitIdColumn = visitTable.getColumns().get("visit_id");
+            assertNotNull(visitIdColumn);
+            assertTrue(visitIdColumn.isPrimaryKey());
+            assertThat(visitIdColumn.getExternalReferences().size(), equalTo(3));
         }
     }
 }

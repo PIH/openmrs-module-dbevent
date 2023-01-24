@@ -3,8 +3,10 @@ package org.openmrs.module.dbevent;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Represents metadata for a Database
@@ -22,5 +24,20 @@ public class DatabaseTable implements Serializable {
 
     public void addColumn(DatabaseColumn column) {
         columns.put(column.getColumnName(), column);
+    }
+
+    public Set<String> getTablesWithReferences() {
+        Set<String> ret = new HashSet<>();
+        for (DatabaseColumn column : columns.values()) {
+            for (DatabaseColumn dependentColumn : column.getExternalReferences()) {
+                ret.add(dependentColumn.getTableName());
+            }
+        }
+        return ret;
+    }
+
+    @Override
+    public String toString() {
+        return tableName;
     }
 }
