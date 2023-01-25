@@ -54,42 +54,4 @@ public class DatabaseTest {
             metadata.print();
         }
     }
-
-    @Test
-    public void shouldJoinToPatient() throws Exception {
-        try (Mysql mysql = Mysql.open()) {
-            EventContext ctx = new TestEventContext(mysql);
-            DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
-            List<DatabaseJoin> joins = metadata.getJoins("visit_attribute", "patient", false);
-            assertThat(joins.size(), equalTo(2));
-            assertThat(joins.get(0).getFromColumn().getTableName(), equalTo("visit_attribute"));
-            assertThat(joins.get(0).getFromColumn().getColumnName(), equalTo("visit_id"));
-            assertThat(joins.get(0).getToColumn().getTableName(), equalTo("visit"));
-            assertThat(joins.get(0).getToColumn().getColumnName(), equalTo("visit_id"));
-            assertThat(joins.get(1).getFromColumn().getTableName(), equalTo("visit"));
-            assertThat(joins.get(1).getFromColumn().getColumnName(), equalTo("patient_id"));
-            assertThat(joins.get(1).getToColumn().getTableName(), equalTo("patient"));
-            assertThat(joins.get(1).getToColumn().getColumnName(), equalTo("patient_id"));
-
-            assertJoins(metadata, "test_order", "patient", 2);
-            assertJoins(metadata, "patient_identifier", "patient", 1);
-            assertJoins(metadata, "patient_program", "patient", 1);
-            assertJoins(metadata, "patient_state", "patient", 2);
-            assertJoins(metadata, "patient_program_attribute", "patient", 2);
-            assertJoins(metadata, "visit", "patient", 1);
-            assertJoins(metadata, "visit_attribute", "patient", 2);
-            assertJoins(metadata, "encounter", "patient", 1);
-            assertJoins(metadata, "encounter_provider", "patient", 2);
-            assertJoins(metadata, "note", "patient", 1);
-            assertJoins(metadata, "obs", "patient", 0);
-            assertJoins(metadata, "person", "patient", 0);
-            assertJoins(metadata, "person_name", "patient", 0);
-            assertJoins(metadata, "emr_radiology_order", "patient", 3);
-        }
-    }
-
-    protected void assertJoins(DatabaseMetadata metadata, String fromTable, String toTable, int numJoins) {
-        List<DatabaseJoin> l = metadata.getJoins(fromTable, toTable, false);
-        assertThat(l.size(), equalTo(numJoins));
-    }
 }

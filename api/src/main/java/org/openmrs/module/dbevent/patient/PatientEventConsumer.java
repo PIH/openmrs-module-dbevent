@@ -1,13 +1,8 @@
 package org.openmrs.module.dbevent.patient;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openmrs.Patient;
-import org.openmrs.module.dbevent.DatabaseJoin;
-import org.openmrs.module.dbevent.DatabaseMetadata;
 import org.openmrs.module.dbevent.DatabaseTable;
 import org.openmrs.module.dbevent.DbEvent;
 import org.openmrs.module.dbevent.DbEventSourceConfig;
@@ -21,7 +16,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,14 +33,23 @@ public class PatientEventConsumer implements EventConsumer {
     private static final Logger log = LogManager.getLogger(PatientEventConsumer.class);
 
     private final DbEventSourceConfig config;
-    private final Map<String, PatientIdQuery> patientIdQueries;
+    private final Map<String, String> patientKeys = new LinkedHashMap<>();
     private Rocks keysDb;
     private Rocks statusDb;
     private Long maxEventTimestamp = null;
 
     public PatientEventConsumer(DbEventSourceConfig config) {
         this.config = config;
-        patientIdQueries = getPatientIdQueries();
+        patientKeys.put("patient_id", "patient");
+        patientKeys.put("person_id", "person");
+        patientKeys.put("person_a", "person");
+        patientKeys.put("person_b", "person");
+        patientKeys.put("order_id", "orders");
+        patientKeys.put("patient_program_id", "patient_program");
+        patientKeys.put("encounter_id", "encounter");
+        patientKeys.put("visit_id", "visit");
+        patientKeys.put("allergy_id", "allergy");
+        patientKeys.put("appointment_id", "appointmentscheduling_appointment");
     }
 
     @Override
@@ -81,29 +85,51 @@ public class PatientEventConsumer implements EventConsumer {
             }
             return;
         }
-        Integer patientId = event.getValues().getInteger("patient_id");
-        if (patientId == null) {
-            String rocksKey = event.getTable() + "." + event.getKey() + ":patient_id";
-            patientId = keysDb.get(rocksKey);
-            if (patientId == null) {
-                PatientIdQuery query = patientIdQueries.get(event.getTable());
-                if (query != null) {
-                    Object lookupVal = event.getValues().get(query.getValueColumn());
-                    if (lookupVal != null) {
-                        patientId = config.getContext().getDatabase().executeQuery(query.getSql(), new ScalarHandler<>(1), lookupVal);
-                    }
-                }
-                if (patientId != null) {
-                    keysDb.put(rocksKey, patientId);
+        Set<Integer> patientIds = getPatientIdsForEvent(event);
+        if (patientIds.isEmpty()) {
+            log.warn("Not handling event as not mapped to patient: " + event.getTable());
+        }
+        else {
+            for (Integer patientId : patientIds) {
+                handlePatientEvent(patientId, event);
+            }
+        }
+    }
+
+    /**
+     * For the given event, returns the associated patient ids
+     * @param event the event to retrieve the related patient ids
+     * @return the patient ids associated with the given event
+     */
+    public Set<Integer> getPatientIdsForEvent(DbEvent event) {
+        Set<Integer> ret = new HashSet<>();
+        for (String key : patientKeys.keySet()) {
+            String keyTable = patientKeys.get(key);
+            Integer value = event.getValues().getInteger(key);
+            if (value != null) {
+                StringBuilder query = new StringBuilder("select p.patient_id from patient p inner join ");
+                if (keyTable.equals("person")) {
+                    query.append(event.getTable()).append(" t on t.").append(key).append(" = p.patient_id");
                 }
                 else {
-                    log.warn("No patient found for event, skipping.  Event = " + event);
+                    query.append(keyTable).append(" x on x.").append(key).append(" = p.patient_id ");
+                    query.append("inner join ").append(event.getTable()).append(" t on t.").append(key).append(" = x.").append(key);
+                }
+                Integer patientId = config.getContext().getDatabase().executeQuery(query.toString(), new ScalarHandler<>(1));
+                if (patientId == null) {
+                    if (!keyTable.equals("person")) {
+                        throw new RuntimeException("Unable to retrieve patient_id for: " + event);
+                    }
+                }
+                else {
+                    ret.add(patientId);
+                    if (!event.getTable().equals("relationship") || ret.size() == 2) {
+                        break;
+                    }
                 }
             }
         }
-        if (patientId != null) {
-            handlePatientEvent(patientId, event);
-        }
+        return ret;
     }
 
     /**
@@ -137,114 +163,55 @@ public class PatientEventConsumer implements EventConsumer {
      * This method performs this operation, and returns the max last_updated in the database
      */
     protected void performInitialSnapshot() {
+        log.warn("Performing initial snapshot into dbevent_patient from: patient.patient_id");
         config.getContext().getDatabase().executeUpdate(
                 "insert ignore into dbevent_patient (patient_id, last_updated, deleted) " +
                         "select patient_id, greatest(date_created, ifnull(date_changed, date_created), ifnull(date_voided, date_created)), voided from patient"
         );
-        DatabaseMetadata metadata = config.getContext().getDatabase().getMetadata();
-        for (DatabaseTable table : metadata.getTables().values()) {
+        for (DatabaseTable table : config.getMonitoredTables()) {
             String tableName = table.getTableName();
             if (config.isIncluded(table) && !tableName.equals("patient")) {
                 Set<String> columns = table.getColumns().keySet();
-                List<String> joins = new ArrayList<>();
-                if (columns.contains("patient_id")) {
-                    joins.add("inner join " + tableName + " x on p.patient_id = x.patient_id");
-                } else if (columns.contains("person_id")) {
-                    joins.add("inner join " + tableName + " x on p.patient_id = x.person_id");
-                } else if (table.getTableName().equals("relationship")) {
-                    joins.add("inner join relationship x on p.patient_id = x.person_a");
-                    joins.add("inner join relationship x on p.patient_id = x.person_b");
-                }
-                else if (columns.contains("patient_program_id")) {
-                    joins.add("inner join patient_program pp on p.patient_id = pp.patient_id inner join " + tableName + " x on x.patient_program_id = pp.patient_program_id");
-                }
-                else if (columns.contains("visit_id")) {
-                    joins.add("inner join visit v on p.patient_id = v.patient_id inner join " + tableName + " x on x.visit_id = v.visit_id");
-                }
-                else if (columns.contains("encounter_id")) {
-                    joins.add("inner join encounter e on p.patient_id = e.patient_id inner join " + tableName + " x on x.encounter_id = e.encounter_id");
-                }
-                else if (columns.contains("allergy_id")) {
-                    joins.add("inner join allergy a on p.patient_id = a.patient_id inner join " + tableName + " x on x.allergy_id = a.allergy_id");
-                }
-                else if (columns.contains("order_id")) {
-                    joins.add("inner join orders o on p.patient_id = o.patient_id inner join " + tableName + " x on x.order_id = o.order_id");
-                }
+
                 List<String> dateCols = new ArrayList<>();
                 if (columns.contains("date_created")) {
-                    dateCols.add("ifnull(x.date_created, p.last_updated)");
+                    dateCols.add("ifnull(t.date_created, p.last_updated)");
                 }
                 if (columns.contains("date_changed")) {
-                    dateCols.add("ifnull(x.date_changed, p.last_updated)");
+                    dateCols.add("ifnull(t.date_changed, p.last_updated)");
                 }
                 if (columns.contains("date_voided")) {
-                    dateCols.add("ifnull(x.date_voided, p.last_updated)");
+                    dateCols.add("ifnull(t.date_voided, p.last_updated)");
                 }
-                if (!joins.isEmpty() && !dateCols.isEmpty()) {
-                    for (String join : joins) {
-                        config.getContext().getDatabase().executeUpdate("update dbevent_patient p " + join + " " +
-                                "set p.last_updated = greatest(p.last_updated, " + String.join(",", dateCols) + ")"
-                        );
-                    }
-                }
-            }
-        }
-    }
 
-    public Map<String, PatientIdQuery> getPatientIdQueries() {
-        Map<String, PatientIdQuery> ret = new LinkedHashMap<>();
-        DatabaseMetadata metadata = config.getContext().getDatabase().getMetadata();
-        for (DatabaseTable table : config.getMonitoredTables()) {
-            String tableName = table.getTableName();
-            List<DatabaseJoin> joins = metadata.getJoins(tableName, "patient", false, "users", "provider");
-            if (!joins.isEmpty()) {
-                StringBuilder sql = new StringBuilder();
-                DatabaseJoin firstJoin = joins.get(0);
-                DatabaseJoin lastJoin = joins.get(joins.size()-1);
-                sql.append("select ").append(lastJoin.getFromColumn().getTableAndColumn());
-                for (int i = 0; i < joins.size()-1; i++) {
-                    DatabaseJoin join = joins.get(i);
-                    String fromTable = join.getFromColumn().getTableName();
-                    String fromColumn = join.getFromColumn().getColumnName();
-                    String toTable = join.getToColumn().getTableName();
-                    String toColumn = join.getToColumn().getColumnName();
-                    if (i == 0) {
-                        sql.append(" from ").append(fromTable).append(" ").append(fromTable);
-                    }
-                    sql.append(" inner join ").append(toTable).append(" ").append(toTable);
-                    sql.append(" on ").append(fromTable).append(".").append(fromColumn);
-                    sql.append(" = ").append(toTable).append(".").append(toColumn);
+                if (dateCols.isEmpty()) {
+                    log.warn("Skipping initial snapshot into dbevent_patient from " + tableName + " as no date columns found");
                 }
-                sql.append(" where ").append(firstJoin.getFromColumn().getTableAndColumn()).append(" = ?");
-                ret.put(table.getTableName(), new PatientIdQuery(firstJoin.getFromColumn().getColumnName(), sql.toString()));
-            }
-            else {
-                joins = metadata.getJoins(tableName, "person", false, "users", "provider");
-                if (!joins.isEmpty()) {
-                    StringBuilder sql = new StringBuilder();
-                    DatabaseJoin firstJoin = joins.get(0);
-                    DatabaseJoin lastJoin = joins.get(joins.size()-1);
-                    sql.append("select ").append(lastJoin.getFromColumn().getTableAndColumn());
-                    for (int i = 0; i < joins.size()-1; i++) {
-                        DatabaseJoin join = joins.get(i);
-                        String fromTable = join.getFromColumn().getTableName();
-                        String fromColumn = join.getFromColumn().getColumnName();
-                        String toTable = join.getToColumn().getTableName();
-                        String toColumn = join.getToColumn().getColumnName();
-                        if (i == 0) {
-                            sql.append(" from ").append(fromTable).append(" ").append(fromTable);
+                else {
+                    for (String key : patientKeys.keySet()) {
+                        if (columns.contains(key)) {
+                            String keyTable = patientKeys.get(key);
+                            StringBuilder sql = new StringBuilder("update dbevent_patient p inner join ");
+                            if (keyTable.equals("patient") || keyTable.equals("person")) {
+                                sql.append(tableName).append(" t on t.").append(key).append(" = p.patient_id");
+                            } else {
+                                sql.append(keyTable).append(" x on x.patient_id = p.patient_id ");
+                                sql.append(" inner join ").append(tableName).append(" t on t.").append(key).append(" = x.").append(key);
+                            }
+                            sql.append(" set p.last_updated = greatest(p.last_updated, ").append(String.join(",", dateCols)).append(")");
+
+                            log.warn("Performing initial snapshot into dbevent_patient from: " + tableName + "." + key);
+                            config.getContext().getDatabase().executeUpdate(sql.toString());
+
+                            // Once we find a match, break, except for relationship table
+                            if (!tableName.equals("relationship") || key.equals("person_b")) {
+                                break;
+                            }
                         }
-                        sql.append(" inner join ").append(toTable).append(" ").append(toTable);
-                        sql.append(" on ").append(fromTable).append(".").append(fromColumn);
-                        sql.append(" = ").append(toTable).append(".").append(toColumn);
                     }
-                    sql.append(" inner join patient patient on person.person_id = patient.patient_id ");
-                    sql.append(" where ").append(firstJoin.getFromColumn().getTableAndColumn()).append(" = ?");
-                    ret.put(table.getTableName(), new PatientIdQuery(firstJoin.getFromColumn().getColumnName(), sql.toString()));
                 }
             }
         }
-        return ret;
     }
 
     protected Long getMaxEventTimestamp() {
@@ -252,17 +219,5 @@ public class PatientEventConsumer implements EventConsumer {
                 "select max(last_updated) from dbevent_patient", new ScalarHandler<>(1)
         );
         return (datetime == null ? null : ZonedDateTime.of(datetime, ZoneId.systemDefault()).toInstant().toEpochMilli());
-    }
-
-    @Data
-    @AllArgsConstructor
-    public static class PatientIdQuery {
-        private String valueColumn;
-        private String sql;
-
-        @Override
-        public String toString() {
-            return sql.replace("?", ":" + valueColumn);
-        }
     }
 }

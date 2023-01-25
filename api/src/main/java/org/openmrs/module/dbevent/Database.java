@@ -140,7 +140,9 @@ public class Database implements Serializable {
      * @param values the values for each parameter in the statement
      */
     public void executeUpdate(String sql, Object... values) {
-        log.debug(sql + " " + Arrays.asList(values));
+        if (log.isTraceEnabled()) {
+            log.trace(sql + " " + Arrays.asList(values));
+        }
         try (Connection conn = openConnection(); ) {
             QueryRunner qr = new QueryRunner();
             qr.execute(conn, sql, values);
