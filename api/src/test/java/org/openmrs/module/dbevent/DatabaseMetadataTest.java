@@ -1,8 +1,8 @@
 package org.openmrs.module.dbevent;
 
 import org.junit.jupiter.api.Test;
-import org.openmrs.module.dbevent.test.Mysql;
-import org.openmrs.module.dbevent.test.TestEventContext;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.openmrs.module.dbevent.test.MysqlExtension;
 
 import java.util.Set;
 
@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(MysqlExtension.class)
 public class DatabaseMetadataTest {
 
     public static final String[] EXPECTED_TABLES = {
@@ -63,46 +64,40 @@ public class DatabaseMetadataTest {
 
     @Test
     public void shouldGetTablesAndColumns() throws Exception {
-        try (Mysql mysql = Mysql.open()) {
-            EventContext ctx = new TestEventContext(mysql);
-            DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
-            assertThat(metadata.getDatabaseName(), equalTo("dbevent"));
-            assertThat(metadata.getTables().size(), equalTo(185));
-            assertThat(metadata.getTable("patient").getColumns().size(), equalTo(10));
-            assertTrue(metadata.getColumn("encounter", "encounter_id").isPrimaryKey());
-        }
+        EventContext ctx = MysqlExtension.getEventContext();
+        DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
+        assertThat(metadata.getDatabaseName(), equalTo("dbevent"));
+        assertThat(metadata.getTables().size(), equalTo(185));
+        assertThat(metadata.getTable("patient").getColumns().size(), equalTo(10));
+        assertTrue(metadata.getColumn("encounter", "encounter_id").isPrimaryKey());
     }
 
     @Test
     public void shouldGetTablesWithReferencesTo() throws Exception {
-        try (Mysql mysql = Mysql.open()) {
-            EventContext ctx = new TestEventContext(mysql);
-            DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
-            Set<String> ppRefs = metadata.getTablesWithReferencesTo("patient_program");
-            assertThat(ppRefs.size(), equalTo(2));
-            assertTrue(ppRefs.contains("patient_state"));
-            assertTrue(ppRefs.contains("patient_program_attribute"));
-            String[] excludedTables = {"users", "provider"};
-            Set<String> personRefs = metadata.getTablesWithReferencesTo("person", excludedTables);
-            assertEquals(EXPECTED_TABLES.length, personRefs.size());
-            for (String expectedTable : EXPECTED_TABLES) {
-                assertTrue(personRefs.contains(expectedTable));
-            }
+        EventContext ctx = MysqlExtension.getEventContext();
+        DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
+        Set<String> ppRefs = metadata.getTablesWithReferencesTo("patient_program");
+        assertThat(ppRefs.size(), equalTo(2));
+        assertTrue(ppRefs.contains("patient_state"));
+        assertTrue(ppRefs.contains("patient_program_attribute"));
+        String[] excludedTables = {"users", "provider"};
+        Set<String> personRefs = metadata.getTablesWithReferencesTo("person", excludedTables);
+        assertEquals(EXPECTED_TABLES.length, personRefs.size());
+        for (String expectedTable : EXPECTED_TABLES) {
+            assertTrue(personRefs.contains(expectedTable));
         }
     }
 
     @Test
     public void shouldGetPatientTableNames() throws Exception {
-        try (Mysql mysql = Mysql.open()) {
-            EventContext ctx = new TestEventContext(mysql);
-            DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
-            Set<String> tableNames = metadata.getPatientTableNames();
-            assertThat(tableNames.size(), equalTo(EXPECTED_TABLES.length + 1)); // Deps + person
-            for (String expectedTable : EXPECTED_TABLES) {
-                assertTrue(tableNames.contains(expectedTable));
-            }
-            assertTrue(tableNames.contains("person"));
+        EventContext ctx = MysqlExtension.getEventContext();
+        DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
+        Set<String> tableNames = metadata.getPatientTableNames();
+        assertThat(tableNames.size(), equalTo(EXPECTED_TABLES.length + 1)); // Deps + person
+        for (String expectedTable : EXPECTED_TABLES) {
+            assertTrue(tableNames.contains(expectedTable));
         }
+        assertTrue(tableNames.contains("person"));
     }
 
     public void print(DatabaseMetadata metadata) {
