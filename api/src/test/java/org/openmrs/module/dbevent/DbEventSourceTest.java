@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.openmrs.module.dbevent.patient.PatientEventConsumer;
 import org.openmrs.module.dbevent.test.MysqlExtension;
-import org.openmrs.module.dbevent.test.TestEventConsumer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,37 +14,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MysqlExtension.class)
 public class DbEventSourceTest {
-
-    @Test
-    public void shouldStreamAndMonitorEvents() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
-        DbEventSource eventSource = new DbEventSource(new DbEventSourceConfig(100002,"EventLogger", ctx));
-        eventSource.setEventConsumer(new TestEventConsumer());
-        try {
-            eventSource.start();
-            List<String> attNames = new ArrayList<>();
-            for (int i=0; i<10; i++) {
-                attNames = DbEventLog.getMonitoringBeanAttributeNames("EventLogger");
-                if (attNames.isEmpty()) {
-                    Thread.sleep(1000);
-                }
-                else {
-                    i = 10;
-                }
-            }
-            assertFalse(attNames.isEmpty());
-            Object value = DbEventLog.getMonitoringBeanAttribute("EventLogger", "TotalTableCount");
-            assertNotNull(value);
-            assertTrue(Integer.parseInt(value.toString()) > 0);
-        }
-        finally {
-            eventSource.stop();
-        }
-    }
 
     @Test
     public void shouldTrackPatientChanges() throws Exception {

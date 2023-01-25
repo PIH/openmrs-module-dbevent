@@ -12,9 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This source emits DbEvents from a configured database
@@ -81,24 +81,19 @@ public class DbEventSource {
         catch (Exception e) {
             log.warn("Error shutting down event consumer", e);
         }
-        try {
-            if (engine != null) {
-                log.info("Closing execution engine");
-                engine.close();
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (engine != null) {
+                    log.info("Closing execution engine");
+                    engine.close();
+                }
             }
-        }
-        catch (IOException e) {
-            log.warn("An error occurred while attempting to close the engine", e);
-        }
-        try {
+            catch (IOException e) {
+                log.warn("An error occurred while attempting to close the engine", e);
+            }
+
             log.info("Shutting down executor");
             executor.shutdown();
-            while (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                log.info("Waiting another 5 seconds for the embedded engine to shut down");
-            }
-        }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        });
     }
 }
