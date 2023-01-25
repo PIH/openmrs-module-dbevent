@@ -29,6 +29,9 @@ public class DatabaseColumn implements Serializable {
         this.nullable = nullable;
     }
 
+    /**
+     * @return the fully qualified column name as tableName.columnName
+     */
     public String getTableAndColumn() {
         return tableName + "." + columnName;
     }
