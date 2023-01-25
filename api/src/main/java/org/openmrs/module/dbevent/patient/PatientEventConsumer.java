@@ -10,6 +10,7 @@ import org.openmrs.module.dbevent.DbEventSourceConfig;
 import org.openmrs.module.dbevent.EventConsumer;
 import org.openmrs.module.dbevent.Operation;
 import org.openmrs.module.dbevent.Rocks;
+import org.openmrs.module.dbevent.SqlBuilder;
 
 import java.io.File;
 import java.sql.Timestamp;
@@ -110,15 +111,16 @@ public class PatientEventConsumer implements EventConsumer {
             String keyTable = patientKeys.get(key);
             Integer value = event.getValues().getInteger(key);
             if (value != null) {
-                StringBuilder query = new StringBuilder("select p.patient_id from patient p inner join ");
+                SqlBuilder sql = new SqlBuilder();
+                sql.select("p.patient_id").from("patient", "p");
                 if (keyTable.equals("person")) {
-                    query.append(event.getTable()).append(" t on t.").append(key).append(" = p.patient_id");
+                    sql.innerJoin(event.getTable(), "t", key, "p", "patient_id");
                 }
                 else {
-                    query.append(keyTable).append(" x on x.").append(key).append(" = p.patient_id ");
-                    query.append("inner join ").append(event.getTable()).append(" t on t.").append(key).append(" = x.").append(key);
+                    sql.innerJoin(keyTable, "x", key, "p", "patient_id");
+                    sql.innerJoin(event.getTable(), "t", key, "x", key);
                 }
-                Integer patientId = database.executeQuery(query.toString(), new ScalarHandler<>(1));
+                Integer patientId = database.executeQuery(sql.toString(), new ScalarHandler<>(1));
                 if (patientId == null) {
                     if (!keyTable.equals("person")) {
                         throw new RuntimeException("Unable to retrieve patient_id for: " + event);
@@ -194,12 +196,14 @@ public class PatientEventConsumer implements EventConsumer {
                     for (String key : patientKeys.keySet()) {
                         if (columns.contains(key)) {
                             String keyTable = patientKeys.get(key);
-                            StringBuilder sql = new StringBuilder("update dbevent_patient p inner join ");
+                            SqlBuilder sql = new SqlBuilder();
+                            sql.append("update dbevent_patient p");
                             if (keyTable.equals("patient") || keyTable.equals("person")) {
-                                sql.append(tableName).append(" t on t.").append(key).append(" = p.patient_id");
-                            } else {
-                                sql.append(keyTable).append(" x on x.patient_id = p.patient_id ");
-                                sql.append(" inner join ").append(tableName).append(" t on t.").append(key).append(" = x.").append(key);
+                                sql.innerJoin(tableName, "t", key, "p", "patient_id");
+                            }
+                            else {
+                                sql.innerJoin(keyTable, "x", "patient_id", "p", "patient_id");
+                                sql.innerJoin(tableName, "t", key, "x", key);
                             }
                             sql.append(" set p.last_updated = greatest(p.last_updated, ").append(String.join(",", dateCols)).append(")");
 
