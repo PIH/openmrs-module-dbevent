@@ -19,20 +19,22 @@ public class EventContext {
 
     private File applicationDataDir;
     private Properties runtimeProperties;
-    private Database database;
 
     public EventContext() {
         applicationDataDir = OpenmrsUtil.getApplicationDataDirectoryAsFile();
         runtimeProperties = Context.getRuntimeProperties();
     }
 
+    /**
+     * @return a database object constructed from the given runtime properties.
+     */
     public Database getDatabase() {
-        if (database == null) {
-            database = new Database(runtimeProperties);
-        }
-        return database;
+        return new Database(runtimeProperties);
     }
 
+    /**
+     * @return the directory for module-related data
+     */
     public File getModuleDataDir() {
         return new File(applicationDataDir, "dbevent");
     }

@@ -30,6 +30,12 @@ public class DbEventLog {
 	private static final Map<String, DbEventStatus> latestEvents = new HashMap<>();
 	private static final Map<String, Map<String, Integer>> tableCounts = new HashMap<>();
 
+	/**
+	 * Provides a mechanism to log each event, in order to
+	 * have access to basic counts of progress for each source and information on the latest event sent
+	 * @param event the event to log
+	 * @return a new DbEventStatus for the given event
+	 */
 	public static synchronized DbEventStatus log(DbEvent event) {
 		// Log the event, if enabled
 		if (log.isTraceEnabled()) {
@@ -45,23 +51,39 @@ public class DbEventLog {
 		return status;
 	}
 
+	/**
+	 * @param source the source to query
+	 * @return the DbEventStatus representing the status of the most recently logged DbEvent
+	 */
 	public static DbEventStatus getLatestEventStatus(String source) {
 		return latestEvents.get(source);
 	}
 
+	/**
+	 * @return the DbEventStatus representing the status of the most recently logged DbEvent for each source
+	 */
 	public Map<String, DbEventStatus> getLatestEventStatuses() {
 		return latestEvents;
 	}
 
+	/**
+	 * @return the running count of events processed by source and table, since the server has started
+	 */
 	public static Map<String, Map<String, Integer>> getTableCounts() {
 		return tableCounts;
 	}
 
+	/**
+	 * @param source the source to query
+	 * @return the running count of events processed by table for the given source, since the server has started
+	 */
 	public static Map<String, Integer> getTableCounts(String source) {
 		return tableCounts.computeIfAbsent(source, k -> new HashMap<>());
 	}
 
 	/**
+	 * @param sourceName the source to query
+	 * @return the MBean ObjectName for the given source from Debezium
 	 * See https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-monitoring
 	 */
 	public static ObjectName getMonitoringBeanName(String sourceName) {
@@ -73,6 +95,10 @@ public class DbEventLog {
 		}
 	}
 
+	/**
+	 * @param sourceName the source to query
+	 * @return the Debezium monitoring bean for the given source
+	 */
 	public static MBeanInfo getMonitoringBean(String sourceName) {
 		try {
 			return ManagementFactory.getPlatformMBeanServer().getMBeanInfo(getMonitoringBeanName(sourceName));
@@ -82,6 +108,10 @@ public class DbEventLog {
 		}
 	}
 
+	/**
+	 * @param sourceName the source to query
+	 * @return the List of attributes found in the Debezium monitoring bean for the given source
+	 */
 	public static List<String> getMonitoringBeanAttributeNames(String sourceName) {
 		List<String> ret = new ArrayList<>();
 		try {
@@ -97,6 +127,11 @@ public class DbEventLog {
 		return ret;
 	}
 
+	/**
+	 * @param sourceName the source to query
+	 * @param att the name of the attribute to query
+	 * @return the value of the attribute found in the Debezium monitoring bean for the given source with the given name
+	 */
 	public static Object getMonitoringBeanAttribute(String sourceName, String att) {
 		try {
 			return ManagementFactory.getPlatformMBeanServer().getAttribute(getMonitoringBeanName(sourceName), att);

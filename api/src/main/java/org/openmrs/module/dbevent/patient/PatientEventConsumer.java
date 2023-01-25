@@ -3,6 +3,7 @@ package org.openmrs.module.dbevent.patient;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openmrs.module.dbevent.Database;
 import org.openmrs.module.dbevent.DatabaseTable;
 import org.openmrs.module.dbevent.DbEvent;
 import org.openmrs.module.dbevent.DbEventSourceConfig;
@@ -33,6 +34,7 @@ public class PatientEventConsumer implements EventConsumer {
     private static final Logger log = LogManager.getLogger(PatientEventConsumer.class);
 
     private final DbEventSourceConfig config;
+    private final Database database;
     private final Map<String, String> patientKeys = new LinkedHashMap<>();
     private Rocks keysDb;
     private Rocks statusDb;
@@ -40,6 +42,7 @@ public class PatientEventConsumer implements EventConsumer {
 
     public PatientEventConsumer(DbEventSourceConfig config) {
         this.config = config;
+        this.database = config.getContext().getDatabase();
         patientKeys.put("patient_id", "patient");
         patientKeys.put("person_id", "person");
         patientKeys.put("person_a", "person");
@@ -115,7 +118,7 @@ public class PatientEventConsumer implements EventConsumer {
                     query.append(keyTable).append(" x on x.").append(key).append(" = p.patient_id ");
                     query.append("inner join ").append(event.getTable()).append(" t on t.").append(key).append(" = x.").append(key);
                 }
-                Integer patientId = config.getContext().getDatabase().executeQuery(query.toString(), new ScalarHandler<>(1));
+                Integer patientId = database.executeQuery(query.toString(), new ScalarHandler<>(1));
                 if (patientId == null) {
                     if (!keyTable.equals("person")) {
                         throw new RuntimeException("Unable to retrieve patient_id for: " + event);
@@ -143,15 +146,15 @@ public class PatientEventConsumer implements EventConsumer {
         }
         Timestamp lastUpdated = new Timestamp(event.getTimestamp());
         String sql = "insert into dbevent_patient (patient_id, last_updated) values (?, ?) on duplicate key update last_updated = ?";
-        config.getContext().getDatabase().executeUpdate(sql, patientId, lastUpdated, lastUpdated);
+        database.executeUpdate(sql, patientId, lastUpdated, lastUpdated);
         if (event.getTable().equals("patient")) {
             if (event.getOperation() == Operation.DELETE || event.getValues().getBoolean("voided")) {
                 sql = "update dbevent_patient set deleted = true where patient_id = ? and deleted = false";
-                config.getContext().getDatabase().executeUpdate(sql, patientId);
+                database.executeUpdate(sql, patientId);
             }
             else if (!event.getValues().getBoolean("voided")) {
                 sql = "update dbevent_patient set deleted = false where patient_id = ? and deleted = true";
-                config.getContext().getDatabase().executeUpdate(sql, patientId);
+                database.executeUpdate(sql, patientId);
             }
         }
         maxEventTimestamp = event.getTimestamp();
@@ -164,7 +167,7 @@ public class PatientEventConsumer implements EventConsumer {
      */
     protected void performInitialSnapshot() {
         log.warn("Performing initial snapshot into dbevent_patient from: patient.patient_id");
-        config.getContext().getDatabase().executeUpdate(
+        database.executeUpdate(
                 "insert ignore into dbevent_patient (patient_id, last_updated, deleted) " +
                         "select patient_id, greatest(date_created, ifnull(date_changed, date_created), ifnull(date_voided, date_created)), voided from patient"
         );
@@ -201,7 +204,7 @@ public class PatientEventConsumer implements EventConsumer {
                             sql.append(" set p.last_updated = greatest(p.last_updated, ").append(String.join(",", dateCols)).append(")");
 
                             log.warn("Performing initial snapshot into dbevent_patient from: " + tableName + "." + key);
-                            config.getContext().getDatabase().executeUpdate(sql.toString());
+                            database.executeUpdate(sql.toString());
 
                             // Once we find a match, break, except for relationship table
                             if (!tableName.equals("relationship") || key.equals("person_b")) {
@@ -215,7 +218,7 @@ public class PatientEventConsumer implements EventConsumer {
     }
 
     protected Long getMaxEventTimestamp() {
-        LocalDateTime datetime = config.getContext().getDatabase().executeQuery(
+        LocalDateTime datetime = database.executeQuery(
                 "select max(last_updated) from dbevent_patient", new ScalarHandler<>(1)
         );
         return (datetime == null ? null : ZonedDateTime.of(datetime, ZoneId.systemDefault()).toInstant().toEpochMilli());

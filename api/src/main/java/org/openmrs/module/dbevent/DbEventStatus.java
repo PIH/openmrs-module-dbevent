@@ -17,6 +17,7 @@ import lombok.Data;
  */
 @Data
 public class DbEventStatus {
+
 	private final DbEvent event;
 	private boolean processed = false;
 	private Throwable error;

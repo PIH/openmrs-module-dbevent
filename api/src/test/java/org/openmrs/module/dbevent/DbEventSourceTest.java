@@ -3,6 +3,7 @@ package org.openmrs.module.dbevent;
 import org.apache.commons.dbutils.handlers.MapListHandler;
 import org.junit.jupiter.api.Test;
 import org.openmrs.module.dbevent.patient.PatientEventConsumer;
+import org.openmrs.module.dbevent.test.TestEventConsumer;
 import org.openmrs.module.dbevent.test.Mysql;
 import org.openmrs.module.dbevent.test.TestEventContext;
 
@@ -23,7 +24,7 @@ public class DbEventSourceTest {
         try (Mysql mysql = Mysql.open()) {
             EventContext ctx = new TestEventContext(mysql);
             DbEventSource eventSource = new DbEventSource(new DbEventSourceConfig(100002,"EventLogger", ctx));
-            eventSource.setEventConsumer(new LoggingEventConsumer());
+            eventSource.setEventConsumer(new TestEventConsumer());
             try {
                 eventSource.start();
                 List<String> attNames = new ArrayList<>();
