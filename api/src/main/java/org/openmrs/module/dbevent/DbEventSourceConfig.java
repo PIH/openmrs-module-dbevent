@@ -41,7 +41,7 @@ public class DbEventSourceConfig {
         setProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
         setProperty("offset.storage.file.filename", offsetsDataFile.getAbsolutePath());
         setProperty("offset.flush.interval.ms", "0");
-        setProperty("offset.flush.timeout.ms", "15000");
+        setProperty("offset.flush.timeout.ms", "5000");
         setProperty("include.schema.changes", "false");
         setProperty("database.server.id", Integer.toString(sourceId));
         setProperty("database.server.name", sourceName);

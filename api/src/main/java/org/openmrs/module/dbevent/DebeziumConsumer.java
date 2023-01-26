@@ -19,6 +19,7 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
 
     private final DbEventSourceConfig eventSourceConfig;
     private final EventConsumer eventConsumer;
+    private boolean stopped = false;
 
     public DebeziumConsumer(EventConsumer eventConsumer, DbEventSourceConfig eventSourceConfig) {
         this.eventConsumer = eventConsumer;
@@ -36,6 +37,9 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
     @Override
     public final void accept(ChangeEvent<SourceRecord, SourceRecord> changeEvent) {
         DbEventStatus status = null;
+        if (stopped) {
+            throw new RuntimeException("The Debezium consumer has been stopped prior to processing: " + changeEvent);
+        }
         try {
             DbEvent event = new DbEvent(changeEvent);
             status = DbEventLog.log(event);
@@ -54,5 +58,9 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
             }
             accept(changeEvent);
         }
+    }
+
+    public void cancel() {
+        this.stopped = true;
     }
 }

@@ -2,14 +2,18 @@ package org.openmrs.module.dbevent;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.openmrs.module.dbevent.test.EventMatcher;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 import org.openmrs.module.dbevent.test.TestEventConsumer;
+import org.openmrs.module.dbevent.test.TestUtils;
 
-import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -21,23 +25,50 @@ public class DbEventLogTest {
     @Test
     public void shouldStreamAndMonitorEvents() throws Exception {
         EventContext ctx = MysqlExtension.getEventContext();
-        DbEventSource eventSource = new DbEventSource(new DbEventSourceConfig(100002, SOURCE, ctx));
-        int numMonitoredTables = eventSource.getConfig().getMonitoredTables().size();
+        DbEventSourceConfig config = new DbEventSourceConfig(100002, SOURCE, ctx);
+        config.configureTablesToInclude(Arrays.asList("encounter_type", "location"));
+        DbEventSource eventSource = new DbEventSource(config);
         TestEventConsumer consumer = new TestEventConsumer();
-        consumer.setForceErrorAfterNum(10);
         eventSource.setEventConsumer(consumer);
         try {
             eventSource.start();
-            while (consumer.getEvents().size() < 10) {
-                Thread.sleep(1000);
-            }
+            TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
             DbEventStatus status = DbEventLog.getLatestEventStatus(SOURCE);
             assertThat(status.getEvent(), equalTo(consumer.getLastEvent()));
-            assertThat(status.getError(), notNullValue());
+            assertThat(status.getError(), nullValue());
             assertFalse(status.isProcessed());
-            List<String> attNames = DbEventLog.getMonitoringBeanAttributeNames(SOURCE);
-            assertFalse(attNames.isEmpty());
-            Object value = DbEventLog.getMonitoringBeanAttribute(SOURCE, "TotalTableCount");
+            Map<String, Object> snapshotAttributes = DbEventLog.getSnapshotMonitoringAttributes(SOURCE);
+            assertFalse(snapshotAttributes.isEmpty());
+            Object value = snapshotAttributes.get("TotalTableCount");
+            assertNotNull(value);
+            int totalTableCount = Integer.parseInt(value.toString());
+            assertThat(2, equalTo(totalTableCount));
+        }
+        finally {
+            eventSource.stop();
+        }
+    }
+
+    @Test
+    public void shouldLogErrorOfLatestEvent() throws Exception {
+        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventSourceConfig config = new DbEventSourceConfig(100002, SOURCE, ctx);
+        config.configureTablesToInclude(Collections.singletonList("encounter_type"));
+        DbEventSource eventSource = new DbEventSource(config);
+        int numMonitoredTables = eventSource.getConfig().getMonitoredTables().size();
+        TestEventConsumer consumer = new TestEventConsumer();
+        consumer.setSimulateErrorOnEvent(new EventMatcher(Operation.READ, "encounter_type", "encounter_type_id", 10L));
+        eventSource.setEventConsumer(consumer);
+        try {
+            eventSource.start();
+            TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
+            DbEventStatus status = DbEventLog.getLatestEventStatus(SOURCE);
+            assertThat(status.getEvent(), equalTo(consumer.getLastEvent()));
+            assertThat(status.getError(), nullValue());
+            assertFalse(status.isProcessed());
+            Map<String, Object> snapshotAttributes = DbEventLog.getSnapshotMonitoringAttributes(SOURCE);
+            assertFalse(snapshotAttributes.isEmpty());
+            Object value = snapshotAttributes.get("TotalTableCount");
             assertNotNull(value);
             int totalTableCount = Integer.parseInt(value.toString());
             assertThat(numMonitoredTables, equalTo(totalTableCount));

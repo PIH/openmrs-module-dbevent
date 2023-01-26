@@ -3,35 +3,32 @@ package org.openmrs.module.dbevent;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This source emits DbEvents from a configured database
  */
-@Data
 public class DbEventSource {
 
     private static final Logger log = LogManager.getLogger(DbEventSource.class);
 
     private final DbEventSourceConfig config;
+    private DebeziumConsumer debeziumConsumer;
     private EventConsumer eventConsumer;
-
-    @Getter(AccessLevel.PRIVATE)
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-
-    @Getter(AccessLevel.PRIVATE)
+    private ExecutorService executor;
     private DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine;
+
+    public DbEventSource(DbEventSourceConfig config) {
+        this.config = config;
+    }
 
     /**
      * Allows for resetting the source.  This deletes any existing history and offset files.
@@ -59,13 +56,15 @@ public class DbEventSource {
 
         log.info("Starting event consumer: " + eventConsumer);
         eventConsumer.startup();
+        debeziumConsumer = new DebeziumConsumer(eventConsumer, config);
 
         engine = DebeziumEngine.create(Connect.class)
                 .using(config.getConfig())
-                .notifying(new DebeziumConsumer(eventConsumer, config))
+                .notifying(debeziumConsumer)
                 .build();
 
         log.info("Starting execution engine");
+        executor = Executors.newSingleThreadExecutor();
         executor.execute(engine);
     }
 
@@ -81,19 +80,43 @@ public class DbEventSource {
         catch (Exception e) {
             log.warn("Error shutting down event consumer", e);
         }
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (engine != null) {
-                    log.info("Closing execution engine");
-                    engine.close();
-                }
-            }
-            catch (IOException e) {
-                log.warn("An error occurred while attempting to close the engine", e);
-            }
 
-            log.info("Shutting down executor");
+        debeziumConsumer.cancel();
+
+        try {
+            if (engine != null) {
+                log.info("Closing execution engine");
+                engine.close();
+            }
+        }
+        catch (IOException e) {
+            log.warn("An error occurred while attempting to close the engine", e);
+        }
+
+        log.info("Shutting down executor");
+        try {
             executor.shutdown();
-        });
+            while (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.info("Waiting another 5 seconds for the Debezium engine to shut down");
+            }
+            executor = null;
+        }
+        catch ( InterruptedException e ) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * @return the DbEventSourceConfig that this Source was configured with
+     */
+    public DbEventSourceConfig getConfig() {
+        return config;
+    }
+
+    /**
+     * @param eventConsumer the EventConsumer to consume events on this source
+     */
+    public void setEventConsumer(EventConsumer eventConsumer) {
+        this.eventConsumer = eventConsumer;
     }
 }

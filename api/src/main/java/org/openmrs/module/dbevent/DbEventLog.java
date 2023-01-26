@@ -14,11 +14,10 @@ import org.apache.logging.log4j.Logger;
 
 import javax.management.MBeanAttributeInfo;
 import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,6 +25,7 @@ import java.util.Map;
  */
 public class DbEventLog {
 
+	private static final MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
 	private static final Logger log = LogManager.getLogger(DbEventLog.class);
 	private static final Map<String, DbEventStatus> latestEvents = new HashMap<>();
 	private static final Map<String, Map<String, Integer>> tableCounts = new HashMap<>();
@@ -82,62 +82,40 @@ public class DbEventLog {
 	}
 
 	/**
-	 * @param sourceName the source to query
-	 * @return the MBean ObjectName for the given source from Debezium
-	 * See https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-monitoring
+	 * @param sourceName the sourceName to query
+	 * @return the value of the all debezium snapshot monitoring bean attributes
 	 */
-	public static ObjectName getMonitoringBeanName(String sourceName) {
-		try {
-			return new ObjectName("debezium.mysql:type=connector-metrics,context=snapshot,server=" + sourceName);
-		}
-		catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+	public static Map<String, Object> getSnapshotMonitoringAttributes(String sourceName) {
+		String name = "debezium.mysql:type=connector-metrics,context=snapshot,server=" + sourceName;
+		return getMBeanAttributes(name);
 	}
 
 	/**
-	 * @param sourceName the source to query
-	 * @return the Debezium monitoring bean for the given source
+	 * @param sourceName the sourceName to query
+	 * @return the value of the all debezium streaming monitoring bean attributes
 	 */
-	public static MBeanInfo getMonitoringBean(String sourceName) {
-		try {
-			return ManagementFactory.getPlatformMBeanServer().getMBeanInfo(getMonitoringBeanName(sourceName));
-		}
-		catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+	public static Map<String, Object> getStreamingMonitoringAttributes(String sourceName) {
+		String name = "debezium.mysql:type=connector-metrics,context=streaming,server=" + sourceName;
+		return getMBeanAttributes(name);
 	}
 
 	/**
-	 * @param sourceName the source to query
-	 * @return the List of attributes found in the Debezium monitoring bean for the given source
+	 * @param name the mbean name to query
+	 * @return the value of the all monitoring bean attributes with the given name
 	 */
-	public static List<String> getMonitoringBeanAttributeNames(String sourceName) {
-		List<String> ret = new ArrayList<>();
+	private static Map<String, Object> getMBeanAttributes(String name) {
+		Map<String, Object> ret = new HashMap<>();
 		try {
-			MBeanInfo beanInfo = getMonitoringBean(sourceName);
+			ObjectName n = new ObjectName(name);
+			MBeanInfo beanInfo = mbeanServer.getMBeanInfo(n);
 			for (MBeanAttributeInfo attribute : beanInfo.getAttributes()) {
-				ret.add(attribute.getName());
+				String attributeName = attribute.getName();
+				ret.put(attributeName, mbeanServer.getAttribute(n, attributeName));
 			}
-			return ret;
 		}
 		catch (Exception e) {
-			log.warn("Error getting monitoring mean attribute names", e);
+			log.trace("An error occurred trying to get monitoring attributes for " + name, e);
 		}
 		return ret;
-	}
-
-	/**
-	 * @param sourceName the source to query
-	 * @param att the name of the attribute to query
-	 * @return the value of the attribute found in the Debezium monitoring bean for the given source with the given name
-	 */
-	public static Object getMonitoringBeanAttribute(String sourceName, String att) {
-		try {
-			return ManagementFactory.getPlatformMBeanServer().getAttribute(getMonitoringBeanName(sourceName), att);
-		}
-		catch (Exception e) {
-			throw new RuntimeException(e);
-		}
 	}
 }
