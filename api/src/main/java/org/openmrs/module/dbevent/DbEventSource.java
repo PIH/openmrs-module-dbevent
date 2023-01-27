@@ -66,6 +66,7 @@ public class DbEventSource {
         log.info("Starting execution engine");
         executor = Executors.newSingleThreadExecutor();
         executor.execute(engine);
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
     /**
