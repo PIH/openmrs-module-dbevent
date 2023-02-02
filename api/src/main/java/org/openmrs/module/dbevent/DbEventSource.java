@@ -115,6 +115,13 @@ public class DbEventSource {
     }
 
     /**
+     * @return the EventConsumer configured to consume events on this source
+     */
+    public EventConsumer getEventConsumer() {
+        return eventConsumer;
+    }
+
+    /**
      * @param eventConsumer the EventConsumer to consume events on this source
      */
     public void setEventConsumer(EventConsumer eventConsumer) {

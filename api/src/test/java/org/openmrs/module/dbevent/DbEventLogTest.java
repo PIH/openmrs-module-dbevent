@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MysqlExtension.class)
 public class DbEventLogTest {
@@ -36,7 +37,7 @@ public class DbEventLogTest {
             DbEventStatus status = DbEventLog.getLatestEventStatus(SOURCE);
             assertThat(status.getEvent(), equalTo(consumer.getLastEvent()));
             assertThat(status.getError(), nullValue());
-            assertFalse(status.isProcessed());
+            assertTrue(status.isProcessed());
             Map<String, Object> snapshotAttributes = DbEventLog.getSnapshotMonitoringAttributes(SOURCE);
             assertFalse(snapshotAttributes.isEmpty());
             Object value = snapshotAttributes.get("TotalTableCount");
@@ -65,7 +66,6 @@ public class DbEventLogTest {
             DbEventStatus status = DbEventLog.getLatestEventStatus(SOURCE);
             assertThat(status.getEvent(), equalTo(consumer.getLastEvent()));
             assertThat(status.getError(), nullValue());
-            assertFalse(status.isProcessed());
             Map<String, Object> snapshotAttributes = DbEventLog.getSnapshotMonitoringAttributes(SOURCE);
             assertFalse(snapshotAttributes.isEmpty());
             Object value = snapshotAttributes.get("TotalTableCount");

@@ -44,6 +44,7 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
             DbEvent event = new DbEvent(changeEvent);
             status = DbEventLog.log(event);
             eventConsumer.accept(event);
+            status.setProcessed(true);
         }
         catch (Throwable e) {
             log.error("An error occurred processing change event: " + changeEvent  + ". Retrying in 1 minute", e);
