@@ -42,13 +42,17 @@ public class DatabaseMetadata implements Serializable {
      * @return all tables directly or indirectly referenced by the given table, but not excluded
      */
     public Set<String> getTablesWithReferencesTo(String tableName, String... excludedTables) {
-        Set<String> ret = new TreeSet<>(tables.get(tableName).getTablesReferencedBy());
-        Arrays.asList(excludedTables).forEach(ret::remove);
-        List<String> nestedTables = new ArrayList<>(ret);
-        for (String nestedTable : nestedTables) {
-            List<String> nestedExclusions = new ArrayList<>(Arrays.asList(excludedTables));
-            nestedExclusions.addAll(ret);
-            ret.addAll(getTablesWithReferencesTo(nestedTable, nestedExclusions.toArray(new String[0])));
+        Set<String> ret = new TreeSet<>();
+        DatabaseTable table = tables.get(tableName);
+        if (table != null) {
+            ret.addAll(table.getTablesReferencedBy());
+            Arrays.asList(excludedTables).forEach(ret::remove);
+            List<String> nestedTables = new ArrayList<>(ret);
+            for (String nestedTable : nestedTables) {
+                List<String> nestedExclusions = new ArrayList<>(Arrays.asList(excludedTables));
+                nestedExclusions.addAll(ret);
+                ret.addAll(getTablesWithReferencesTo(nestedTable, nestedExclusions.toArray(new String[0])));
+            }
         }
         return ret;
     }

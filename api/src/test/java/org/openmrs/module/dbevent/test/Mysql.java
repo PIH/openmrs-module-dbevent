@@ -51,7 +51,7 @@ public class Mysql implements Closeable {
     public String getEnvironmentVariable(String key) {
         for (String env : getContainer().getEnv()) {
             String[] keyValue = env.split("=", 2);
-            if (keyValue[0].trim().equals("MYSQL_ROOT_PASSWORD")) {
+            if (keyValue[0].trim().equals(key)) {
                 return keyValue.length == 2 ? keyValue[1].trim() : null;
             }
         }

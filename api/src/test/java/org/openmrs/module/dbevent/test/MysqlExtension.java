@@ -1,9 +1,15 @@
 package org.openmrs.module.dbevent.test;
 
+import org.apache.commons.lang.StringUtils;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.extension.ExtensionContext.Namespace.GLOBAL;
 
@@ -11,7 +17,8 @@ public class MysqlExtension implements BeforeAllCallback, ExtensionContext.Store
 
     private static final Logger log = LoggerFactory.getLogger(MysqlExtension.class);
 
-    private static Mysql mysql;
+    private static Properties mysqlProperties = null;
+    private static Mysql mysql = null;
 
     @Override
     public void beforeAll(ExtensionContext extensionContext) throws Exception {
@@ -20,8 +27,12 @@ public class MysqlExtension implements BeforeAllCallback, ExtensionContext.Store
         Object contextVal = globalStore.get(uniqueKey);
         if (contextVal == null) {
             globalStore.put(uniqueKey, this);
-            log.warn("Opening MySQL database");
-            mysql = Mysql.open();
+            mysqlProperties = loadExternalMysqlProperties();
+            if (mysqlProperties.isEmpty()) {
+                log.warn("Opening MySQL database");
+                mysql = Mysql.open();
+                mysqlProperties = mysql.getConnectionProperties();
+            }
         }
     }
 
@@ -34,6 +45,17 @@ public class MysqlExtension implements BeforeAllCallback, ExtensionContext.Store
     }
 
     public static TestEventContext getEventContext() {
-        return new TestEventContext(mysql);
+        return new TestEventContext(mysqlProperties);
+    }
+
+    protected Properties loadExternalMysqlProperties() throws Exception {
+        Properties p = new Properties();
+        String propertiesFile = System.getProperty("MYSQL_PROPERTIES_FILE");
+        if (StringUtils.isNotBlank(propertiesFile)) {
+            try (InputStream is = Files.newInputStream(Paths.get(propertiesFile))) {
+                p.load(is);
+            }
+        }
+        return p;
     }
 }
