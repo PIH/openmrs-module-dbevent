@@ -145,7 +145,7 @@ public class Database implements Serializable {
         }
         try (Connection conn = openConnection(); ) {
             QueryRunner qr = new QueryRunner();
-            qr.execute(conn, sql, values);
+            qr.update(conn, sql, values);
         }
         catch (Exception e) {
             throw new RuntimeException("An error occurred updating executing statement " + sql, e);
