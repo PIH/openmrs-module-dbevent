@@ -96,9 +96,11 @@ public class DbEventSource {
 
         log.info("Shutting down executor");
         try {
-            executor.shutdown();
-            while (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                log.info("Waiting another 5 seconds for the Debezium engine to shut down");
+            if (executor != null) {
+                executor.shutdown();
+                while (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    log.info("Waiting another 5 seconds for the Debezium engine to shut down");
+                }
             }
             executor = null;
         }
