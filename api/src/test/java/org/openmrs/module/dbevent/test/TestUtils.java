@@ -1,6 +1,8 @@
 package org.openmrs.module.dbevent.test;
 
 import org.openmrs.module.dbevent.DbEventLog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 public class TestUtils {
 
     private static final long SLEEP_INTERVAL = 1000;
+
+    private static final Logger log = LoggerFactory.getLogger(TestUtils.class);
 
     public static void waitForSnapshotToStart(String sourceName) {
         boolean completed = false;
@@ -33,7 +37,7 @@ public class TestUtils {
         long num = 0;
         while (num < numberToWaitFor) {
             Long seen = (Long) getSnapshotAttributes(sourceName).get("TotalNumberOfEventsSeen");
-            System.out.println("Waiting for " + numberToWaitFor + " snapshot events in " + sourceName + ". Current = " + seen);
+            log.warn("Waiting for " + numberToWaitFor + " snapshot events in " + sourceName + ". Current = " + seen);
             num = (seen == null ? 0 : seen);
             sleep(SLEEP_INTERVAL);
         }
