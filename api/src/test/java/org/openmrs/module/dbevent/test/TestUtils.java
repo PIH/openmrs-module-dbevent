@@ -33,6 +33,7 @@ public class TestUtils {
         long num = 0;
         while (num < numberToWaitFor) {
             Long seen = (Long) getSnapshotAttributes(sourceName).get("TotalNumberOfEventsSeen");
+            System.out.println("Waiting for " + numberToWaitFor + " snapshot events in " + sourceName + ". Current = " + seen);
             num = (seen == null ? 0 : seen);
             sleep(SLEEP_INTERVAL);
         }
