@@ -5,7 +5,6 @@ import lombok.Data;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +67,58 @@ public class DatabaseMetadata implements Serializable {
         Set<String> ret = new TreeSet<>(getTablesWithReferencesTo("person", excludedTables));
         ret.add("person");
         return ret;
+    }
+
+    /**
+     * Returns a List of DatabaseJoinPaths that represent the shortest distinct pathways that join back
+     * to the specified column from the specified table, excluding any pathways that go through the tablesToExclude list
+     * @param fromTable the table to start from
+     * @param toColumn the column to naviagate to
+     * @param tablesToExclude any pathways through these tables will be excluded
+     * @return the List of DatabaseJoinPaths from the given table to the given column
+     */
+    public List<DatabaseJoinPath> getPathsToColumn(DatabaseTable fromTable, DatabaseColumn toColumn, List<String> tablesToExclude) {
+
+        // Ensure the exclusions list includes the current table for this and recursive invocations
+        List<String> exclusions = new ArrayList<>(tablesToExclude);
+        exclusions.add(fromTable.getTableName());
+
+        // Collect all join pathways
+        List<DatabaseJoinPath> allPaths = new ArrayList<>();
+        Integer minPathSize = null;
+        for (DatabaseJoin join : fromTable.getForeignKeyReferences()) {
+            if (!exclusions.contains(join.getPrimaryKey().getTableName())) {
+                DatabaseJoinPath path = new DatabaseJoinPath();
+                path.add(join);
+                if (join.getPrimaryKey().equals(toColumn)) {
+                    allPaths.add(path);
+                    minPathSize = (minPathSize == null || minPathSize > path.size() ? path.size() : minPathSize);
+                } else {
+                    DatabaseTable refTable = getTable(join.getPrimaryKey().getTableName());
+                    List<DatabaseJoinPath> pathsFromRef = getPathsToColumn(refTable, toColumn, exclusions);
+                    for (DatabaseJoinPath pathFromRef : pathsFromRef) {
+                        DatabaseJoinPath refPath = path.clone();
+                        refPath.addAll(pathFromRef);
+                        allPaths.add(refPath);
+                        minPathSize = (minPathSize == null || minPathSize > refPath.size() ? refPath.size() : minPathSize);
+                    }
+                }
+            }
+        }
+
+        // Identify if there are any non-nullable paths.  If so, return all that have the shortest length
+        List<DatabaseJoinPath> shortestNonNullablePaths = new ArrayList<>();
+        for (DatabaseJoinPath path : allPaths) {
+            if (path.size() == minPathSize && !path.isNullable()) {
+                shortestNonNullablePaths.add(path);
+            }
+        }
+
+        if (!shortestNonNullablePaths.isEmpty()) {
+            return shortestNonNullablePaths;
+        }
+
+        return allPaths;
     }
 
     /**
