@@ -29,6 +29,7 @@ public class Database implements Serializable {
     private String hostname;
     private String port;
     private String databaseName;
+    private DatabaseMetadata metadata;
 
     public Database(Properties properties) {
         this.url = properties.getProperty("connection.url");
@@ -73,50 +74,51 @@ public class Database implements Serializable {
     /**
      * @return a DatabaseMetadata that contains information on the tables in the configured database
      */
-    public DatabaseMetadata getMetadata() {
-        DatabaseMetadata ret = new DatabaseMetadata();
-        ret.setDatabaseName(databaseName);
-        try (Connection connection = openConnection();) {
-            try (ResultSet tableRs = connection.getMetaData().getTables(databaseName, null, "%", new String[] { "TABLE" })) {
-                while (tableRs.next()) {
-                    String tableName = tableRs.getString("TABLE_NAME").toLowerCase();
-                    DatabaseTable table = new DatabaseTable(databaseName, tableName);
-                    try (ResultSet columnRs = connection.getMetaData().getColumns(databaseName, null, tableName, "%")) {
-                        while (columnRs.next()) {
-                            String columnName = columnRs.getString("COLUMN_NAME").toLowerCase();
-                            boolean nullable = "YES".equals(columnRs.getString("IS_NULLABLE"));
-                            table.addColumn(new DatabaseColumn(databaseName, tableName, columnName, nullable));
+    public synchronized DatabaseMetadata getMetadata() {
+        if (metadata == null) {
+            metadata = new DatabaseMetadata();
+            metadata.setDatabaseName(databaseName);
+            try (Connection connection = openConnection();) {
+                try (ResultSet tableRs = connection.getMetaData().getTables(databaseName, null, "%", new String[]{"TABLE"})) {
+                    while (tableRs.next()) {
+                        String tableName = tableRs.getString("TABLE_NAME").toLowerCase();
+                        DatabaseTable table = new DatabaseTable(databaseName, tableName);
+                        try (ResultSet columnRs = connection.getMetaData().getColumns(databaseName, null, tableName, "%")) {
+                            while (columnRs.next()) {
+                                String columnName = columnRs.getString("COLUMN_NAME").toLowerCase();
+                                boolean nullable = "YES".equals(columnRs.getString("IS_NULLABLE"));
+                                table.addColumn(new DatabaseColumn(databaseName, tableName, columnName, nullable));
+                            }
                         }
-                    }
-                    try (ResultSet pkRs = connection.getMetaData().getPrimaryKeys(databaseName, null , tableName)) {
-                        while (pkRs.next()) {
-                            String columnName = pkRs.getString("COLUMN_NAME").toLowerCase();
-                            table.getColumns().get(columnName).setPrimaryKey(true);
+                        try (ResultSet pkRs = connection.getMetaData().getPrimaryKeys(databaseName, null, tableName)) {
+                            while (pkRs.next()) {
+                                String columnName = pkRs.getString("COLUMN_NAME").toLowerCase();
+                                table.getColumns().get(columnName).setPrimaryKey(true);
+                            }
                         }
-                    }
-                    ret.addTable(table);
-                }
-            }
-            for (DatabaseTable table : ret.getTables().values()) {
-                String tableName = table.getTableName();
-                try (ResultSet fkRs = connection.getMetaData().getExportedKeys(databaseName, null, tableName)) {
-                    while (fkRs.next()) {
-                        String fkTableName = fkRs.getString("FKTABLE_NAME").toLowerCase();
-                        String fkColumnName = fkRs.getString("FKCOLUMN_NAME").toLowerCase();
-                        String pkColumnName = fkRs.getString("PKCOLUMN_NAME").toLowerCase();
-                        DatabaseColumn pkColumn = table.getColumns().get(pkColumnName);
-                        DatabaseTable fkTable = ret.getTables().get(fkTableName);
-                        DatabaseColumn fkColumn = fkTable.getColumns().get(fkColumnName);
-                        pkColumn.getReferencedBy().add(fkColumn);
-                        fkColumn.getReferences().add(pkColumn);
+                        metadata.addTable(table);
                     }
                 }
+                for (DatabaseTable table : metadata.getTables().values()) {
+                    String tableName = table.getTableName();
+                    try (ResultSet fkRs = connection.getMetaData().getExportedKeys(databaseName, null, tableName)) {
+                        while (fkRs.next()) {
+                            String fkTableName = fkRs.getString("FKTABLE_NAME").toLowerCase();
+                            String fkColumnName = fkRs.getString("FKCOLUMN_NAME").toLowerCase();
+                            String pkColumnName = fkRs.getString("PKCOLUMN_NAME").toLowerCase();
+                            DatabaseColumn pkColumn = table.getColumns().get(pkColumnName);
+                            DatabaseTable fkTable = metadata.getTables().get(fkTableName);
+                            DatabaseColumn fkColumn = fkTable.getColumns().get(fkColumnName);
+                            pkColumn.getReferencedBy().add(fkColumn);
+                            fkColumn.getReferences().add(pkColumn);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Unable to retrieve included tables", e);
             }
         }
-        catch (Exception e) {
-            throw new RuntimeException("Unable to retrieve included tables", e);
-        }
-        return ret;
+        return metadata;
     }
 
     /**
