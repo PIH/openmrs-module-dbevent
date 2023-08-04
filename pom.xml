@@ -22,7 +22,7 @@
 	</scm>
 
 	<properties>
-		<openmrsVersion>2.6.1</openmrsVersion>
+		<openmrsVersion>2.5.7</openmrsVersion>
 		<debeziumVersion>1.8.0.Final</debeziumVersion>
 		<lombokVersion>1.18.24</lombokVersion>
 		<rocksdbVersion>7.6.0</rocksdbVersion>
