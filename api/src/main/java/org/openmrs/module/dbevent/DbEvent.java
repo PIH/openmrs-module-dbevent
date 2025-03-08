@@ -49,10 +49,6 @@ public class DbEvent implements Serializable {
         }
     }
 
-    public String getUuid() {
-        return getValues().getString("uuid");
-    }
-
     @Override
     public String toString() {
         return operation + " " + table + " " + key;

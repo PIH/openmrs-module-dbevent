@@ -9,6 +9,7 @@
  */
 package org.openmrs.module.dbevent;
 
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,7 +28,11 @@ public class DbEventLog {
 
 	private static final MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
 	private static final Logger log = LogManager.getLogger(DbEventLog.class);
+
+	@Getter
 	private static final Map<String, DbEventStatus> latestEvents = new HashMap<>();
+
+	@Getter
 	private static final Map<String, Map<String, Integer>> tableCounts = new HashMap<>();
 
 	/**
@@ -57,20 +62,6 @@ public class DbEventLog {
 	 */
 	public static DbEventStatus getLatestEventStatus(String source) {
 		return latestEvents.get(source);
-	}
-
-	/**
-	 * @return the DbEventStatus representing the status of the most recently logged DbEvent for each source
-	 */
-	public Map<String, DbEventStatus> getLatestEventStatuses() {
-		return latestEvents;
-	}
-
-	/**
-	 * @return the running count of events processed by source and table, since the server has started
-	 */
-	public static Map<String, Map<String, Integer>> getTableCounts() {
-		return tableCounts;
 	}
 
 	/**
@@ -114,7 +105,7 @@ public class DbEventLog {
 			}
 		}
 		catch (Exception e) {
-			log.trace("An error occurred trying to get monitoring attributes for " + name, e);
+			log.trace("An error occurred trying to get monitoring attributes for {}", name, e);
 		}
 		return ret;
 	}
