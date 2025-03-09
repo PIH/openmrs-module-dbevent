@@ -1,4 +1,4 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;

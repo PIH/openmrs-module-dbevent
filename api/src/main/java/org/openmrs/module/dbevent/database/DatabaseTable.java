@@ -1,4 +1,4 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
 import lombok.Data;
 
@@ -15,6 +15,7 @@ import java.util.Set;
  */
 @Data
 public class DatabaseTable implements Serializable {
+
     private String databaseName;
     private String tableName;
     private Map<String, DatabaseColumn> columns = new LinkedHashMap<>();
@@ -30,15 +31,6 @@ public class DatabaseTable implements Serializable {
 
     public DatabaseColumn getColumn(String columnName) {
         return columns.get(columnName);
-    }
-
-    public DatabaseColumn getPrimaryKeyColumn() {
-        for (DatabaseColumn column : columns.values()) {
-            if (column.isPrimaryKey()) {
-                return column;
-            }
-        }
-        return null;
     }
 
     public List<DatabaseJoin> getForeignKeyReferences() {

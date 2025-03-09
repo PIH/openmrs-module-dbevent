@@ -4,6 +4,7 @@ import lombok.Data;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openmrs.module.dbevent.database.DatabaseTable;
 
 import java.io.File;
 import java.util.ArrayList;

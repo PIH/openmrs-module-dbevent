@@ -1,10 +1,11 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.MapListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.openmrs.module.dbevent.EventContext;
 import org.openmrs.module.dbevent.test.Mysql;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 

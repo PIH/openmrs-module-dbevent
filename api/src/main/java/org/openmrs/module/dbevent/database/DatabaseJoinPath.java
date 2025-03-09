@@ -1,6 +1,6 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
-import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -8,7 +8,7 @@ import java.util.ArrayList;
 /**
  * Represents metadata for a Database
  */
-@Data
+@EqualsAndHashCode(callSuper = true)
 public class DatabaseJoinPath extends ArrayList<DatabaseJoin> implements Serializable {
 
     /**
@@ -16,9 +16,7 @@ public class DatabaseJoinPath extends ArrayList<DatabaseJoin> implements Seriali
      */
     public DatabaseJoinPath clone() {
         DatabaseJoinPath clone = new DatabaseJoinPath();
-        for (int i=0; i<size(); i++) {
-            clone.add(get(i));
-        }
+        clone.addAll(this);
         return clone;
     }
 
@@ -27,8 +25,7 @@ public class DatabaseJoinPath extends ArrayList<DatabaseJoin> implements Seriali
      */
     public boolean isNullable() {
         boolean nullable = false;
-        for (int i=0; i<size(); i++) {
-            DatabaseJoin join = get(i);
+        for (DatabaseJoin join : this) {
             nullable = nullable || join.isNullable();
         }
         return nullable;

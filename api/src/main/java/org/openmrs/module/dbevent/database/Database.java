@@ -1,4 +1,4 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
 import lombok.Data;
 import org.apache.commons.dbutils.QueryRunner;
@@ -78,7 +78,7 @@ public class Database implements Serializable {
         if (metadata == null) {
             metadata = new DatabaseMetadata();
             metadata.setDatabaseName(databaseName);
-            try (Connection connection = openConnection();) {
+            try (Connection connection = openConnection()) {
                 try (ResultSet tableRs = connection.getMetaData().getTables(databaseName, null, "%", new String[]{"TABLE"})) {
                     while (tableRs.next()) {
                         String tableName = tableRs.getString("TABLE_NAME").toLowerCase();
@@ -127,7 +127,7 @@ public class Database implements Serializable {
      * @param values the values for each parameter in the statement
      */
     public <T> T executeQuery(String sql, ResultSetHandler<T> handler, Object... values)  {
-        try (Connection conn = openConnection(); ) {
+        try (Connection conn = openConnection()) {
             QueryRunner qr = new QueryRunner();
             return qr.query(conn, sql, handler, values);
         }
@@ -143,9 +143,9 @@ public class Database implements Serializable {
      */
     public void executeUpdate(String sql, Object... values) {
         if (log.isTraceEnabled()) {
-            log.trace(sql + " " + Arrays.asList(values));
+            log.trace("{} {}", sql, Arrays.asList(values));
         }
-        try (Connection conn = openConnection(); ) {
+        try (Connection conn = openConnection()) {
             QueryRunner qr = new QueryRunner();
             qr.update(conn, sql, values);
         }

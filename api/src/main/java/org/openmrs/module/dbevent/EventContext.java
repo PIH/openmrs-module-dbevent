@@ -4,6 +4,7 @@ import lombok.Data;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.dbevent.database.Database;
 import org.openmrs.util.OpenmrsUtil;
 
 import java.io.File;

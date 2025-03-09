@@ -1,9 +1,10 @@
-package org.openmrs.module.dbevent;
+package org.openmrs.module.dbevent.database;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.openmrs.module.dbevent.EventContext;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 
 import java.util.Arrays;

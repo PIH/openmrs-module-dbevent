@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.openmrs.module.dbevent.database.Database;
 import org.openmrs.module.dbevent.test.EventMatcher;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 import org.openmrs.module.dbevent.test.TestEventConsumer;
