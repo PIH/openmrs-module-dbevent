@@ -1,11 +1,14 @@
 package org.openmrs.module.dbevent.test;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openmrs.module.dbevent.DbEvent;
-import org.openmrs.module.dbevent.EventConsumer;
+import org.openmrs.module.dbevent.DbEventListener;
+import org.openmrs.module.dbevent.DbEventListenerConfig;
 import org.openmrs.module.dbevent.Operation;
+import org.openmrs.module.dbevent.monitoring.DbEventMonitor;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -14,16 +17,22 @@ import java.util.stream.Collectors;
 /**
  * Simple test event consumer
  */
-@Data
-public class TestEventConsumer implements EventConsumer {
+@Getter
+@Setter
+public class TestEventListener extends DbEventListener {
 
-    private static final Logger log = LogManager.getLogger(TestEventConsumer.class);
+    private static final Logger log = LogManager.getLogger(TestEventListener.class);
 
     private final List<DbEvent> events = new CopyOnWriteArrayList<>();
     private EventMatcher simulateErrorOnEvent = null;
 
+    public TestEventListener(DbEventListenerConfig config) {
+        super(config);
+        DbEventMonitor.unregisterMonitoringBean(this);
+    }
+
     @Override
-    public void accept(DbEvent event) {
+    public void processEvent(DbEvent event) {
         if (simulateErrorOnEvent != null && simulateErrorOnEvent.matches(event)) {
             throw new RuntimeException("TEST_ERROR");
         }

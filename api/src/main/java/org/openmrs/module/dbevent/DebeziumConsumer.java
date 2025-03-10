@@ -17,13 +17,11 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
 
     private static final Logger log = LogManager.getLogger(DebeziumConsumer.class);
 
-    private final DbEventSourceConfig eventSourceConfig;
-    private final EventConsumer eventConsumer;
+    private final DbEventListener eventListener;
     private boolean stopped = false;
 
-    public DebeziumConsumer(EventConsumer eventConsumer, DbEventSourceConfig eventSourceConfig) {
-        this.eventConsumer = eventConsumer;
-        this.eventSourceConfig = eventSourceConfig;
+    public DebeziumConsumer(DbEventListener eventListener) {
+        this.eventListener = eventListener;
     }
 
     /**
@@ -36,23 +34,22 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
      */
     @Override
     public final void accept(ChangeEvent<SourceRecord, SourceRecord> changeEvent) {
-        DbEventStatus status = null;
         if (stopped) {
             throw new RuntimeException("The Debezium consumer has been stopped prior to processing: " + changeEvent);
         }
         try {
             DbEvent event = new DbEvent(changeEvent);
-            status = DbEventLog.log(event);
-            eventConsumer.accept(event);
-            status.setProcessed(true);
+            eventListener.getStatus().processingStarted(event);
+            eventListener.accept(event);
+            eventListener.getStatus().processingCompleted(event);
         }
         catch (Throwable e) {
-            log.error("An error occurred processing change event: {}. Retrying in 1 minute", changeEvent, e);
-            if (status != null) {
-                status.setError(e);
-            }
+            eventListener.getStatus().processingFailed(e);
+            log.error("An error occurred processing change event: {}: {}", changeEvent, e.getMessage());
+            log.debug(e);
             try {
-                TimeUnit.SECONDS.sleep(eventSourceConfig.getRetryIntervalSeconds());
+                log.debug("Retrying in {} ms", eventListener.getConfig().getRetryIntervalMillis());
+                TimeUnit.MILLISECONDS.sleep(eventListener.getConfig().getRetryIntervalMillis());
             }
             catch (Exception e2) {
                 log.error("An exception occurred while waiting to retry processing change event", e2);
@@ -61,7 +58,11 @@ public class DebeziumConsumer implements Consumer<ChangeEvent<SourceRecord, Sour
         }
     }
 
-    public void cancel() {
+    public void start() {
+        this.stopped = false;
+    }
+
+    public void stop() {
         this.stopped = true;
     }
 }

@@ -5,7 +5,7 @@ import org.apache.commons.dbutils.handlers.MapListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.openmrs.module.dbevent.EventContext;
+import org.openmrs.module.dbevent.DbEventContext;
 import org.openmrs.module.dbevent.test.Mysql;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 
@@ -25,7 +25,7 @@ public class DatabaseTest {
 
     @Test
     public void shouldConfigureFromProperties() {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         Database database = ctx.getDatabase();
         assertNotNull(database);
         assertThat(database.getDatabaseName(), equalTo(Mysql.DATABASE_NAME));
@@ -37,7 +37,7 @@ public class DatabaseTest {
 
     @Test
     public void shouldOpenAndCloseConnection() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         Database database = ctx.getDatabase();
         Connection connection = database.openConnection();
         assertFalse(connection.isClosed());
@@ -51,7 +51,7 @@ public class DatabaseTest {
 
     @Test
     public void shouldGetMetadata() {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         String query = "select count(*) from information_schema.tables where table_type = 'base table' AND table_schema = 'dbevent'";
         Long expectedNumTables = ctx.getDatabase().executeQuery(query, new ScalarHandler<>());
         DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
@@ -85,7 +85,7 @@ public class DatabaseTest {
 
     @Test
     public void shouldExecuteQuery() {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         Database database = ctx.getDatabase();
         String sql = "select location_id, name from location order by location_id";
         List<Map<String, Object>> dataset = database.executeQuery(sql, new MapListHandler());
@@ -96,7 +96,7 @@ public class DatabaseTest {
 
     @Test
     public void shouldExecuteUpdate() {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         Database database = ctx.getDatabase();
         String getSql = "select description from location where location_id = ?";
         String updateSql = "update location set description = ? where location_id = ?";

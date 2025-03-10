@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.openmrs.module.dbevent.EventContext;
+import org.openmrs.module.dbevent.DbEventContext;
 import org.openmrs.module.dbevent.test.MysqlExtension;
 
 import java.util.Arrays;
@@ -75,7 +75,7 @@ public class DatabaseMetadataTest {
 
     @Test
     public void shouldGetTablesAndColumns() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
         assertThat(metadata.getDatabaseName(), equalTo("dbevent"));
         assertThat(metadata.getTables().size(), equalTo(185));
@@ -85,7 +85,7 @@ public class DatabaseMetadataTest {
 
     @Test
     public void shouldGetTablesWithReferencesTo() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
         Set<String> ppRefs = metadata.getTablesWithReferencesTo("patient_program");
         assertThat(ppRefs.size(), equalTo(2));
@@ -101,7 +101,7 @@ public class DatabaseMetadataTest {
 
     @Test
     public void shouldGetUniquePathsToColumn() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
         DatabaseColumn toColumn = metadata.getTable("person").getColumn("person_id");
         List<String> exclusions = Arrays.asList("users", "provider");
@@ -186,7 +186,7 @@ public class DatabaseMetadataTest {
 
     @Test
     public void shouldGetPatientTableNames() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
+        DbEventContext ctx = MysqlExtension.getEventContext();
         DatabaseMetadata metadata = ctx.getDatabase().getMetadata();
         Set<String> tableNames = metadata.getPatientTableNames();
         assertThat(tableNames.size(), equalTo(EXPECTED_TABLES.length + 1)); // Deps + person

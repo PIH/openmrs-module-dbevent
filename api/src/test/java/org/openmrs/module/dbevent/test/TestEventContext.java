@@ -1,12 +1,12 @@
 package org.openmrs.module.dbevent.test;
 
 import org.apache.kafka.common.Uuid;
-import org.openmrs.module.dbevent.EventContext;
+import org.openmrs.module.dbevent.DbEventContext;
 
 import java.io.File;
 import java.util.Properties;
 
-public class TestEventContext extends EventContext {
+public class TestEventContext extends DbEventContext {
 
     public TestEventContext(Properties connectionProperties) {
         setRuntimeProperties(connectionProperties);

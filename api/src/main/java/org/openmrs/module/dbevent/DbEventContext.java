@@ -14,14 +14,14 @@ import java.util.Properties;
  * Simple wrapper class access that provides access to the OpenMRS Context and related services
  */
 @Data
-public class EventContext {
+public class DbEventContext {
 
-    private static final Logger log = LogManager.getLogger(EventContext.class);
+    private static final Logger log = LogManager.getLogger(DbEventContext.class);
 
     private File applicationDataDir;
     private Properties runtimeProperties;
 
-    public EventContext() {
+    public DbEventContext() {
         applicationDataDir = OpenmrsUtil.getApplicationDataDirectoryAsFile();
         runtimeProperties = Context.getRuntimeProperties();
     }
