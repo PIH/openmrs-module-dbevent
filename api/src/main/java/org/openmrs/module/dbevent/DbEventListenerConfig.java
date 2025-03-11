@@ -12,7 +12,12 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 /**
- * Represents configuration of Debezium for a particular DbEventListener
+ * Represents the configuration for an instance of a DbEventListener
+ * This configuration is made up of the following core components:
+ * - sourceId is the unique identifier which is used by Debezium to track which change events the listener has processed
+ *   This must be unique across all registered past and present listeners and must not change over time.
+ * - sourceName is a more human-friendly name/description that corresponds to the given sourceId
+ * - properties that control the debezium configuration and listener-specific configurations
  */
 @Data
 public class DbEventListenerConfig {
