@@ -8,7 +8,6 @@ import org.openmrs.module.dbevent.DbEvent;
 import org.openmrs.module.dbevent.DbEventListener;
 import org.openmrs.module.dbevent.DbEventListenerConfig;
 import org.openmrs.module.dbevent.Operation;
-import org.openmrs.module.dbevent.monitoring.DbEventMonitor;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -26,9 +25,9 @@ public class TestEventListener extends DbEventListener {
     private final List<DbEvent> events = new CopyOnWriteArrayList<>();
     private EventMatcher simulateErrorOnEvent = null;
 
-    public TestEventListener(DbEventListenerConfig config) {
-        super(config);
-        DbEventMonitor.unregisterMonitoringBean(this);
+    @Override
+    public void init(DbEventListenerConfig config) {
+        super.init(config);
     }
 
     @Override

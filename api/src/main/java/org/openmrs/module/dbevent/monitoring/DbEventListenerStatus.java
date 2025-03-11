@@ -3,9 +3,7 @@ package org.openmrs.module.dbevent.monitoring;
 import lombok.Data;
 import org.openmrs.module.dbevent.DbEvent;
 import org.openmrs.module.dbevent.DbEventListener;
-
-import java.util.Map;
-import java.util.TreeMap;
+import org.openmrs.module.dbevent.Operation;
 
 /**
  * MBean interface to support jmx monitoring of a DbEventListener
@@ -21,11 +19,14 @@ public class DbEventListenerStatus implements DbEventListenerStatusMXBean {
     private boolean latestEventProcessed = false;
     private String latestEventErrorMessage;
     private Long latestEventErrorRetryNum;
-    private Map<String, Long> eventsProcessedByTable = new TreeMap<>();
+    private long numberOfReads = 0;
+    private long numberOfInserts = 0;
+    private long numberOfUpdates = 0;
+    private long numberOfDeletes = 0;
 
     public void initialize(DbEventListener listener) {
-        setId(listener.getId());
-        setName(listener.getName());
+        setId(listener.getConfig().getSourceId());
+        setName(listener.getConfig().getSourceName());
         setStatus("INITIALIZING");
     }
 
@@ -42,9 +43,21 @@ public class DbEventListenerStatus implements DbEventListenerStatusMXBean {
     public void processingCompleted(DbEvent dbEvent) {
         setStatus("OK");
         setLatestEventProcessed(true);
-        eventsProcessedByTable.compute(dbEvent.getTable(), (k, v) -> v == null ? 1 : v + 1);
         setLatestEventErrorMessage(null);
         setLatestEventErrorRetryNum(null);
+        Operation operation = dbEvent.getOperation();
+        if (operation == Operation.READ) {
+            numberOfReads++;
+        }
+        else if (operation == Operation.INSERT) {
+            numberOfInserts++;
+        }
+        else if (operation == Operation.UPDATE) {
+            numberOfUpdates++;
+        }
+        else if (operation == Operation.DELETE) {
+            numberOfDeletes++;
+        }
     }
 
     public void processingFailed(Throwable e) {

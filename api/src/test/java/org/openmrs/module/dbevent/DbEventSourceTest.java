@@ -28,11 +28,12 @@ public class DbEventSourceTest {
     public void shouldStartAndStopEventSource() throws Exception {
         DbEventContext ctx = MysqlExtension.getEventContext();
         DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location", "encounter_type"));
         config.getListenerConfig().setProperty("retryIntervalMillis", "1000");
-        TestEventListener listener = new TestEventListener(config);
+        TestEventListener listener = new TestEventListener();
         try {
-            listener.start();
+            listener.init(config);
             TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
         }
         finally {
@@ -46,12 +47,13 @@ public class DbEventSourceTest {
     public void shouldStartAndStopAndRestart() throws Exception {
         DbEventContext ctx = MysqlExtension.getEventContext();
         DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("location"));
-        TestEventListener listener = new TestEventListener(config);
+        TestEventListener listener = new TestEventListener();
         listener.setSimulateErrorOnEvent(new EventMatcher(Operation.UPDATE, "location", "location_id", 2));
         final Database db = ctx.getDatabase();
         try {
-            listener.start();
+            listener.init(config);
             TestUtils.waitForSnapshotToStart(SOURCE);
             db.executeUpdate("update location set date_changed = now() where location_id = 1");
             db.executeUpdate("update location set date_changed = now() where location_id = 2");

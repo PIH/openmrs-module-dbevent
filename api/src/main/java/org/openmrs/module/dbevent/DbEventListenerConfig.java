@@ -23,6 +23,10 @@ public class DbEventListenerConfig {
     private final Properties debeziumConfig;
     private final DbEventContext context;
 
+    public DbEventListenerConfig(Integer sourceId, String sourceName) {
+        this(sourceId, sourceName, new DbEventContext());
+    }
+
     public DbEventListenerConfig(Integer sourceId, String sourceName, DbEventContext context) {
         this.sourceId = sourceId;
         this.sourceName = sourceName;
@@ -49,7 +53,7 @@ public class DbEventListenerConfig {
         debeziumConfig.setProperty("database.history.file.filename", schemaHistoryDataFile.getAbsolutePath());
         debeziumConfig.setProperty("decimal.handling.mode", "double");
         debeziumConfig.setProperty("tombstones.on.delete", "false");
-        debeziumConfig.setProperty("snapshot.mode", "when_needed");
+        debeziumConfig.setProperty("snapshot.mode", "schema_only");
         debeziumConfig.setProperty("database.user", context.getDatabase().getUsername());
         debeziumConfig.setProperty("database.password", context.getDatabase().getPassword());
         debeziumConfig.setProperty("database.hostname", context.getDatabase().getHostname());
@@ -59,18 +63,24 @@ public class DbEventListenerConfig {
         
         for (String runtimePropertyName : context.getRuntimeProperties().stringPropertyNames()) {
             String sourcePrefix = "dbevent." + sourceId + ".";
-            String debeziumPrefix = "debezium.";
             if (runtimePropertyName.toLowerCase().startsWith(sourcePrefix)) {
-                String propertyValue = context.getRuntimeProperties().getProperty(runtimePropertyName);
-                String sourcePropertyName = runtimePropertyName.substring(sourcePrefix.length());
-                if (sourcePropertyName.startsWith(debeziumPrefix)) {
-                    String debeziumPropertyName = sourcePropertyName.substring(debeziumPrefix.length());
-                    debeziumConfig.setProperty(debeziumPropertyName, propertyValue);
-                }
-                else {
-                    listenerConfig.setProperty(sourcePropertyName, propertyValue);
-                }
+                setProperty(runtimePropertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
             }
+        }
+    }
+
+    public void setProperty(String key, String value) {
+        String sourcePrefix = "dbevent." + sourceId + ".";
+        String debeziumPrefix = "debezium.";
+        if (key.toLowerCase().startsWith(sourcePrefix)) {
+            key = key.substring(sourcePrefix.length());
+        }
+        if (key.startsWith(debeziumPrefix)) {
+            String debeziumPropertyName = key.substring(debeziumPrefix.length());
+            debeziumConfig.setProperty(debeziumPropertyName, value);
+        }
+        else {
+            listenerConfig.setProperty(key, value);
         }
     }
 
@@ -180,22 +190,6 @@ public class DbEventListenerConfig {
     }
 
     /**
-     * @param key the property to lookup
-     * @return the configuration property with the given key
-     */
-    public String getListenerConfigValue(String key) {
-        return listenerConfig.getProperty(key);
-    }
-
-    /**
-     * @param key the property to lookup
-     * @return the configuration property with the given key
-     */
-    public String getDebeziumConfigValue(String key) {
-        return debeziumConfig.getProperty(key);
-    }
-
-    /**
      * @return the configured retry interval in milliseconds, in case of a processing error;  defaults to 1 minute
      */
     public int getRetryIntervalMillis() {
@@ -205,6 +199,13 @@ public class DbEventListenerConfig {
         catch (Exception e) {
             return 60000;
         }
+    }
+
+    /**
+     * @return true if this listener is enabled, which is true by default
+     */
+    public boolean isEnabled() {
+        return Boolean.parseBoolean(listenerConfig.getProperty("enabled", "true"));
     }
 
     /**

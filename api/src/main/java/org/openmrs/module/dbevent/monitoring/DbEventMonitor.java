@@ -17,12 +17,8 @@ import javax.management.MBeanAttributeInfo;
 import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import javax.management.openmbean.CompositeData;
-import javax.management.openmbean.TabularData;
 import java.lang.management.ManagementFactory;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -33,29 +29,25 @@ public class DbEventMonitor {
 	private static final Logger log = LogManager.getLogger(DbEventMonitor.class);
 	private static final MBeanServer mbeanServer = ManagementFactory.getPlatformMBeanServer();
 
-	public static void registerMonitoringBean(DbEventListener listener) {
+	public static void registerMonitoringBeans(DbEventListener listener) {
 		try {
-			String name = getDbEventStatusMBeanName(listener);
-			mbeanServer.registerMBean(listener.getStatus(), new ObjectName(name));
+			ObjectName name = getDbEventStatusMBeanName(listener);
+			mbeanServer.registerMBean(listener.getStatus(), name);
 		}
 		catch (Exception e) {
-			log.warn("Error registering monitoring bean for {}", listener.getName(), e);
+			log.warn("Error registering monitoring bean for {}", listener.getConfig().getSourceName(), e);
 		}
 	}
 
-	public static void unregisterMonitoringBean(DbEventListener listener) {
+	public static void unregisterMonitoringBeans(DbEventListener listener) {
 		try {
-			String name = getDbEventStatusMBeanName(listener);
-			ObjectName mbeanName = new ObjectName(name);
-			if (mbeanServer.isRegistered(mbeanName)) {
-				mbeanServer.unregisterMBean(new ObjectName(name));
-			}
-			else {
-				log.warn("Unable to unregister monitoring bean {} as it is not registered", name);
+			ObjectName name = getDbEventStatusMBeanName(listener);
+			if (mbeanServer.isRegistered(name)) {
+				mbeanServer.unregisterMBean(name);
 			}
 		}
 		catch (Exception e) {
-			log.warn("Error unregistering monitoring bean for {}", listener.getName(), e);
+			log.warn("Error unregistering monitoring bean for {}", listener.getConfig().getSourceName(), e);
 		}
 	}
 
@@ -63,39 +55,31 @@ public class DbEventMonitor {
 	 * @return the value of the all status attributes for the given listener
 	 */
 	public static Map<String, Object> getDbEventListenerStatusAttributes(DbEventListener listener) {
-		String name = getDbEventStatusMBeanName(listener);
+		ObjectName name = getDbEventStatusMBeanName(listener);
 		return getMBeanAttributes(name);
 	}
 
+	/**
+	 * Get the status of the given DbEventListener
+	 */
 	public static DbEventListenerStatus getDbEventListenerStatus(DbEventListener listener) {
 		Map<String, Object> m = getDbEventListenerStatusAttributes(listener);
 		DbEventListenerStatus status = null;
 		if (!m.isEmpty()) {
 			status = new DbEventListenerStatus();
-			status.setId(listener.getId());
-			status.setName(listener.getName());
+			status.setId(listener.getConfig().getSourceId());
+			status.setName(listener.getConfig().getSourceName());
 			status.setStatus((String) m.get("Status"));
 			status.setLatestEvent((String) m.get("LatestEvent"));
 			status.setLatestEventProcessed((Boolean) m.get("LatestEventProcessed"));
 			status.setLatestEventErrorMessage((String) m.get("LatestEventErrorMessage"));
 			status.setLatestEventErrorRetryNum((Long) m.get("LatestEventErrorRetryNum"));
-			TabularData td = (TabularData) m.get("EventsProcessedByTable");
-			for (Object row : td.values()) {
-				CompositeData cd = (CompositeData) row;
-				List<?> values = new ArrayList<>(cd.values());
-				status.getEventsProcessedByTable().put((String) values.get(0), (Long) values.get(1));
-			}
+			status.setNumberOfReads((Long) m.get("NumberOfReads"));
+			status.setNumberOfInserts((Long) m.get("NumberOfInserts"));
+			status.setNumberOfUpdates((Long) m.get("NumberOfUpdates"));
+			status.setNumberOfDeletes((Long) m.get("NumberOfDeletes"));
 		}
 		return status;
-	}
-
-	/**
-	 * Get the name of the DbEventListenerStatus MBean for the given listener
-	 */
-	public static String getDbEventStatusMBeanName(DbEventListener listener) {
-		String packageName = DbEventListenerStatus.class.getPackage().getName();
-		String className = DbEventListenerStatus.class.getSimpleName();
-		return packageName + ":type=" + className + ",id=" + listener.getId();
 	}
 
 	/**
@@ -123,16 +107,40 @@ public class DbEventMonitor {
 	private static Map<String, Object> getMBeanAttributes(String name) {
 		Map<String, Object> ret = new HashMap<>();
 		try {
-			ObjectName n = new ObjectName(name);
-			MBeanInfo beanInfo = mbeanServer.getMBeanInfo(n);
+			ret = getMBeanAttributes(new ObjectName(name));
+		}
+		catch (Exception e) {
+			log.trace("An error occurred trying to get monitoring attributes for {}", name, e);
+		}
+		return ret;
+	}
+
+	private static Map<String, Object> getMBeanAttributes(ObjectName name) {
+		Map<String, Object> ret = new HashMap<>();
+		try {
+			MBeanInfo beanInfo = mbeanServer.getMBeanInfo(name);
 			for (MBeanAttributeInfo attribute : beanInfo.getAttributes()) {
 				String attributeName = attribute.getName();
-				ret.put(attributeName, mbeanServer.getAttribute(n, attributeName));
+				ret.put(attributeName, mbeanServer.getAttribute(name, attributeName));
 			}
 		}
 		catch (Exception e) {
 			log.trace("An error occurred trying to get monitoring attributes for {}", name, e);
 		}
 		return ret;
+	}
+
+	/**
+	 * Get the name of the DbEventListenerStatus MBean for the given listener
+	 */
+	public static ObjectName getDbEventStatusMBeanName(DbEventListener listener) {
+		try {
+			String packageName = DbEventListenerStatus.class.getPackage().getName();
+			String className = DbEventListenerStatus.class.getSimpleName();
+			return new ObjectName(packageName + ":type=" + className + ",id=" + listener.getConfig().getSourceId());
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

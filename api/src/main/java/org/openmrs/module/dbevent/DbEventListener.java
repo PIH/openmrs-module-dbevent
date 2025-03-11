@@ -8,8 +8,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.Marker;
-import org.apache.logging.log4j.MarkerManager;
 import org.apache.logging.log4j.ThreadContext;
 import org.openmrs.module.dbevent.monitoring.DbEventListenerStatus;
 import org.openmrs.module.dbevent.monitoring.DbEventMonitor;
@@ -26,42 +24,38 @@ import java.util.function.Consumer;
 public abstract class DbEventListener implements Consumer<DbEvent> {
 
     private final Logger log = LogManager.getLogger(getClass());
-    public static final Marker EVENT_MARKER = MarkerManager.getMarker("DB_EVENT");
 
     @Getter
-    private final Integer id;
+    private DbEventListenerConfig config;
 
-    @Getter
-    private final String name;
-
-    @Getter
-    private final DbEventListenerConfig config;
-
-    @Getter
     private DbEventListenerStatus status;
 
     private DebeziumConsumer debeziumConsumer;
 
-    private ExecutorService executor;
+    ExecutorService executor;
 
     private DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine;
 
     /**
-     * Id must be unique across all other DbEventListeners (and any other Debezium clients or mysql replication nodes)
+     * Default constructor
      */
-    public DbEventListener(Integer id) {
-        this.id = id;
-        this.name = getClass().getSimpleName();
-        this.config = new DbEventListenerConfig(this.id, this.name, new DbEventContext());
+    public DbEventListener() {
     }
 
     /**
-     * Constructor that allows full configuration
+     * The primary mechanism by which listeners are registered within OpenMRS
      */
-    public DbEventListener(DbEventListenerConfig config) {
-        this.id = config.getSourceId();
-        this.name = config.getSourceName();
+    public void init(DbEventListenerConfig config) {
         this.config = config;
+        if (config == null || config.getSourceId() == null) {
+            throw new IllegalArgumentException("The config must have a valid source id");
+        }
+        if (config.isEnabled()) {
+            start();
+        }
+        else {
+            log.warn("{} is disabled", getClass().getSimpleName());
+        }
     }
 
     /**
@@ -87,11 +81,25 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     /**
      * This is the actual method that is implemented for each DbEvent.
      * Subclasses should typically implement processEvent rather than override this method
+     * Trace logs the given event for the given EVENT_MARKER.
+     * This allows logging configurations that would support comprehensive audit logging as appropriates
      */
     @Override
-    public final void accept(DbEvent dbEvent) {
-        logEvent(dbEvent);
-        processEvent(dbEvent);
+    public final void accept(DbEvent event) {
+        try {
+            ThreadContext.put("timestamp", event.getTimestamp().toString());
+            ThreadContext.put("sourceName", event.getSourceName());
+            ThreadContext.put("table", event.getTable());
+            ThreadContext.put("operation", event.getOperation().name());
+            ThreadContext.put("key", event.getKey().toString());
+            ThreadContext.put("before", event.getBefore().toString());
+            ThreadContext.put("after", event.getAfter().toString());
+            ThreadContext.put("source", event.getSource().toString());
+            processEvent(event);
+        }
+        finally {
+            ThreadContext.clearAll();
+        }
     }
 
     /**
@@ -110,7 +118,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
         }
 
         getStatus().initialize(this);
-        DbEventMonitor.registerMonitoringBean(this);
+        DbEventMonitor.registerMonitoringBeans(this);
 
         debeziumConsumer = new DebeziumConsumer(this);
         beforeProcessingEvents();
@@ -126,36 +134,16 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
         getStatus().started();
     }
 
+    /**
+     * Get the status of the listener
+     */
     public DbEventListenerStatus getStatus() {
         if (status == null) {
             status = new DbEventListenerStatus();
-            status.setId(getId());
-            status.setName(getName());
+            status.setId(getConfig().getSourceId());
+            status.setName(getConfig().getSourceName());
         }
         return status;
-    }
-
-    /**
-     * Trace logs the given event for the given EVENT_MARKER.
-     * This allows logging configurations that would support comprehensive audit logging as appropriates
-     */
-    public synchronized void logEvent(DbEvent event) {
-        if (log.isTraceEnabled()) {
-            try {
-                ThreadContext.put("timestamp", event.getTimestamp().toString());
-                ThreadContext.put("sourceName", event.getSourceName());
-                ThreadContext.put("table", event.getTable());
-                ThreadContext.put("operation", event.getOperation().name());
-                ThreadContext.put("key", event.getKey().toString());
-                ThreadContext.put("before", event.getBefore().toString());
-                ThreadContext.put("after", event.getAfter().toString());
-                ThreadContext.put("source", event.getSource().toString());
-                log.trace(EVENT_MARKER, ThreadContext.getContext().toString());
-            }
-            finally {
-                ThreadContext.clearAll();
-            }
-        }
     }
 
     /**
@@ -163,7 +151,12 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
      */
     public void stop() {
         log.info("Stopping {}: {} - {}", getClass().getSimpleName(), config.getSourceId(), config.getSourceName());
-        debeziumConsumer.stop();
+
+        DbEventMonitor.unregisterMonitoringBeans(this);
+
+        if (debeziumConsumer != null) {
+            debeziumConsumer.stop();
+        }
 
         try {
             if (engine != null) {

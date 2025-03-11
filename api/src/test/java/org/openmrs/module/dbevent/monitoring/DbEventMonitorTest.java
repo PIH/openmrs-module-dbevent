@@ -29,10 +29,11 @@ public class DbEventMonitorTest {
     public void shouldStreamAndMonitorEvents() {
         DbEventContext ctx = MysqlExtension.getEventContext();
         DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("encounter_type", "location"));
-        TestEventListener listener = new TestEventListener(config);
+        TestEventListener listener = new TestEventListener();
         try {
-            listener.start();
+            listener.init(config);
             TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
             DbEventListenerStatus s = DbEventMonitor.getDbEventListenerStatus(listener);
             assertNotNull(s);
@@ -58,12 +59,13 @@ public class DbEventMonitorTest {
     public void shouldLogErrorOfLatestEvent() {
         DbEventContext ctx = MysqlExtension.getEventContext();
         DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("encounter_type"));
-        TestEventListener listener = new TestEventListener(config);
-        int numMonitoredTables = listener.getConfig().getMonitoredTables().size();
+        TestEventListener listener = new TestEventListener();
         listener.setSimulateErrorOnEvent(new EventMatcher(Operation.READ, "encounter_type", "encounter_type_id", 10L));
         try {
-            listener.start();
+            listener.init(config);
+            int numMonitoredTables = listener.getConfig().getMonitoredTables().size();
             TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
             DbEventListenerStatus status = DbEventMonitor.getDbEventListenerStatus(listener);
             assertNotNull(status);
