@@ -81,8 +81,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     /**
      * This is the actual method that is implemented for each DbEvent.
      * Subclasses should typically implement processEvent rather than override this method
-     * Trace logs the given event for the given EVENT_MARKER.
-     * This allows logging configurations that would support comprehensive audit logging as appropriates
+     * Sets up a logging context so that downstream log messages can access components of each event
      */
     @Override
     public final void accept(DbEvent event) {
