@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * This source emits DbEvents from a configured database
+ * The DbEventListener class is intended to be the superclass of all Listener implementations that wish
+ * to listen for particular database events and process these in some way.
  */
 public abstract class DbEventListener implements Consumer<DbEvent> {
 
