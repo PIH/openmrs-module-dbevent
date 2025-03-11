@@ -44,7 +44,9 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     }
 
     /**
-     * The primary mechanism by which listeners are registered within OpenMRS
+     * This is the primary mechanism by which listeners are intended to be initialized to start executing in OpenMRS
+     * It is expected that downstream consumers will create an instance of a given Listener class, and call the init
+     * method with a particular configuration to start it up
      */
     public void init(DbEventListenerConfig config) {
         this.config = config;
@@ -66,7 +68,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     public void beforeProcessingEvents() {}
 
     /**
-     * Subclasses should implement this method to process each DbChange event
+     * This is the primary method in this class that subclasses are expected to implement to process a particular DbEvent
      */
     public abstract void processEvent(DbEvent event);
 
@@ -147,7 +149,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     }
 
     /**
-     * Stops the event source
+     * Stops this Listener from processing any further events
      */
     public void stop() {
         log.info("Stopping {}: {} - {}", getClass().getSimpleName(), config.getSourceId(), config.getSourceName());

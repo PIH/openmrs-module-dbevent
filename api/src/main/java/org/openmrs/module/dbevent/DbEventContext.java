@@ -11,7 +11,7 @@ import java.io.File;
 import java.util.Properties;
 
 /**
- * Simple wrapper class access that provides access to the OpenMRS Context and related services
+ * This class is a simple wrapper around aspects of OpenMRS, primarily so that these can be mocked for testing
  */
 @Data
 public class DbEventContext {
