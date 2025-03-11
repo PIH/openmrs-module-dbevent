@@ -137,7 +137,7 @@ public class DbEventMonitor {
 		try {
 			String packageName = DbEventListenerStatus.class.getPackage().getName();
 			String className = DbEventListenerStatus.class.getSimpleName();
-			return new ObjectName(packageName + ":type=" + className + ",id=" + listener.getConfig().getSourceId());
+			return new ObjectName(packageName + ":type=" + className + ",name=" + listener.getConfig().getSourceName());
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);

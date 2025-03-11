@@ -12,7 +12,7 @@ public class AuditLogEventListener extends DbEventListener {
 
     private final Logger log = LogManager.getLogger(getClass());
 
-    public static final Marker AUDIT_LOG_MARKER = MarkerManager.getMarker("AUDIT_LOG_MARKER");
+    public static final Marker AUDIT_LOG_MARKER = MarkerManager.getMarker("DBEVENT_AUDIT_LOG_MARKER");
 
     @Override
     public void processEvent(DbEvent dbEvent) {
