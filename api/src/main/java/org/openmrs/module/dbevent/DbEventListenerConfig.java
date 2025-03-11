@@ -69,6 +69,13 @@ public class DbEventListenerConfig {
         }
     }
 
+    /**
+     * Set a configuration property to a specific value
+     * Properties that are prefixed with "dbevent." will have this prefix stripped
+     * Properties that are prefixed with "dbevent.debezium." or "debezium." will have these prefixes stripped before setting as Debezium config
+     * Properties that are not prefixed with "dbevent.debezium." or "debezium." are not added to the Debezium config,
+     * but are used for non-Debezium-specific configuration of the listener
+     */
     public void setProperty(String key, String value) {
         String sourcePrefix = "dbevent." + sourceId + ".";
         String debeziumPrefix = "debezium.";
