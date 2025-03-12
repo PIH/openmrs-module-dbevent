@@ -69,8 +69,8 @@ debezium.decimal.handling.mode=double
 debezium.tombstones.on.delete=false
 ```
 
-Any property that [Debezium supports](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties) can be configured by prefixing that property with a `debezium.` prefix
-and setting it on the `DbEventListenerConfig`.
+Any property that [Debezium supports](https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties) 
+can be configured by prefixing that property with a `debezium.` prefix and setting it on the `DbEventListenerConfig`.
 
 Any of these properties can be overridden or new properties can be set after source instantiation, and before 
 starting up the source.
