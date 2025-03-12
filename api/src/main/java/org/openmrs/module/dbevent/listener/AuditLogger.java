@@ -20,7 +20,7 @@ import org.openmrs.module.dbevent.DbEventListener;
  * 	 ...
  * 	 <Loggers>
  * 	     ...
- * 	    <Logger name="org.openmrs.module.dbevent.listener.AuditLogEventListener" level="TRACE" additivity="false">
+ * 	    <Logger name="org.openmrs.module.dbevent.listener.AuditLogger" level="TRACE" additivity="false">
  * 	      <AppenderRef ref="AUDIT_LOG">
  * 	        <MarkerFilter marker="DBEVENT_AUDIT_LOG_MARKER"/>
  * 		  </AppenderRef>
