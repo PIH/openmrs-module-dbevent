@@ -23,6 +23,7 @@
 
 	<properties>
 		<openmrsVersion>2.5.7</openmrsVersion>
+		<eventModuleVersion>2.10.0</eventModuleVersion>
 		<debeziumVersion>1.8.0.Final</debeziumVersion>
 		<lombokVersion>1.18.24</lombokVersion>
 		<rocksdbVersion>7.6.0</rocksdbVersion>
@@ -71,6 +72,13 @@
 			<version>${openmrsVersion}</version>
 			<type>pom</type>
 			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.openmrs</groupId>
+			<artifactId>event-api</artifactId>
+			<version>${eventModuleVersion}</version>
+			<scope>provided</scope>
 		</dependency>
 
 		<!-- Debezium -->
@@ -154,13 +162,6 @@
 			<groupId>commons-dbutils</groupId>
 			<artifactId>commons-dbutils</artifactId>
 			<version>1.7</version>
-		</dependency>
-
-		<!-- Rocks DB -->
-		<dependency>
-			<groupId>org.rocksdb</groupId>
-			<artifactId>rocksdbjni</artifactId>
-			<version>${rocksdbVersion}</version>
 		</dependency>
 
 		<!-- Testing -->

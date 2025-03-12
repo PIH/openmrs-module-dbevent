@@ -34,10 +34,14 @@ public abstract class BaseDbEventTest {
 		appDataDir = createAppDataDir();
 		runtimePropertiesFile = new File(appDataDir, "openmrs-runtime.properties");
 		runtimePropertiesFile.deleteOnExit();
-		PatternLayout layout = PatternLayout.newBuilder().withPattern("%m").build();
+		PatternLayout layout = PatternLayout.newBuilder().withPattern(getPattern()).build();
 		memoryAppender = MemoryAppender.newBuilder().setLayout(layout).build();
 		memoryAppender.start();
 		loggers = new ArrayList<>();
+	}
+
+	protected String getPattern() {
+		return "%m";
 	}
 
 	protected void addMemoryAppenderToLogger(Logger logger, Level level) {
