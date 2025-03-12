@@ -32,7 +32,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
 
     private DebeziumConsumer debeziumConsumer;
 
-    ExecutorService executor;
+    private ExecutorService executor;
 
     private DebeziumEngine<ChangeEvent<SourceRecord, SourceRecord>> engine;
 
