@@ -22,10 +22,12 @@ import java.util.stream.Collectors;
 @Data
 public class DbEventListenerConfig {
 
+    public static final String MODULE_PREFIX = "dbevent.";
+    public static final String DEBEZIUM_NAMESPACE = "debezium.";
+
     private final Integer sourceId;
     private final String sourceName;
-    private final Properties listenerConfig;
-    private final Properties debeziumConfig;
+    private final Properties config;
     private final DbEventContext context;
 
     public DbEventListenerConfig(Integer sourceId, String sourceName) {
@@ -36,71 +38,80 @@ public class DbEventListenerConfig {
         this.sourceId = sourceId;
         this.sourceName = sourceName;
         this.context = context;
-        this.listenerConfig = new Properties();
-        this.debeziumConfig = new Properties();
+        this.config = new Properties();
         File offsetsDataFile = new File(context.getModuleDataDir(), sourceId + "_offsets.dat");
         File schemaHistoryDataFile = new File(context.getModuleDataDir(), sourceId + "_schema_history.dat");
 
-        listenerConfig.setProperty("retryIntervalMillis", "60000"); // By default, set 1 minute as the retry interval
+        setProperty("retryIntervalMillis", "60000"); // By default, set 1 minute as the retry interval
 
         // Initialize default values for source configuration.  The full list for MySQL connector properties is here:
         // https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties
-        debeziumConfig.setProperty("name", sourceName);
-        debeziumConfig.setProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
-        debeziumConfig.setProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
-        debeziumConfig.setProperty("offset.storage.file.filename", offsetsDataFile.getAbsolutePath());
-        debeziumConfig.setProperty("offset.flush.interval.ms", "0");
-        debeziumConfig.setProperty("offset.flush.timeout.ms", "5000");
-        debeziumConfig.setProperty("include.schema.changes", "false");
-        debeziumConfig.setProperty("database.server.id", Integer.toString(sourceId));
-        debeziumConfig.setProperty("database.server.name", sourceName);
-        debeziumConfig.setProperty("database.history", "io.debezium.relational.history.FileDatabaseHistory");
-        debeziumConfig.setProperty("database.history.file.filename", schemaHistoryDataFile.getAbsolutePath());
-        debeziumConfig.setProperty("decimal.handling.mode", "double");
-        debeziumConfig.setProperty("tombstones.on.delete", "false");
-        debeziumConfig.setProperty("snapshot.mode", "schema_only");
-        debeziumConfig.setProperty("database.user", context.getDatabase().getUsername());
-        debeziumConfig.setProperty("database.password", context.getDatabase().getPassword());
-        debeziumConfig.setProperty("database.hostname", context.getDatabase().getHostname());
-        debeziumConfig.setProperty("database.port", context.getDatabase().getPort());
-        debeziumConfig.setProperty("database.dbname", context.getDatabase().getDatabaseName());
-        debeziumConfig.setProperty("database.include.list", context.getDatabase().getDatabaseName());
+        setDebeziumProperty("name", sourceName);
+        setDebeziumProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
+        setDebeziumProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
+        setDebeziumProperty("offset.storage.file.filename", offsetsDataFile.getAbsolutePath());
+        setDebeziumProperty("offset.flush.interval.ms", "0");
+        setDebeziumProperty("offset.flush.timeout.ms", "5000");
+        setDebeziumProperty("include.schema.changes", "false");
+        setDebeziumProperty("database.server.id", Integer.toString(sourceId));
+        setDebeziumProperty("database.server.name", sourceName);
+        setDebeziumProperty("database.history", "io.debezium.relational.history.FileDatabaseHistory");
+        setDebeziumProperty("database.history.file.filename", schemaHistoryDataFile.getAbsolutePath());
+        setDebeziumProperty("decimal.handling.mode", "double");
+        setDebeziumProperty("tombstones.on.delete", "false");
+        setDebeziumProperty("snapshot.mode", "schema_only");
+        setDebeziumProperty("database.user", context.getDatabase().getUsername());
+        setDebeziumProperty("database.password", context.getDatabase().getPassword());
+        setDebeziumProperty("database.hostname", context.getDatabase().getHostname());
+        setDebeziumProperty("database.port", context.getDatabase().getPort());
+        setDebeziumProperty("database.dbname", context.getDatabase().getDatabaseName());
+        setDebeziumProperty("database.include.list", context.getDatabase().getDatabaseName());
         
         for (String runtimePropertyName : context.getRuntimeProperties().stringPropertyNames()) {
-            String sourcePrefix = "dbevent." + sourceId + ".";
+            String sourcePrefix = MODULE_PREFIX + sourceId + ".";
             if (runtimePropertyName.toLowerCase().startsWith(sourcePrefix)) {
-                setProperty(runtimePropertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
+                String propertyName = runtimePropertyName.substring(sourcePrefix.length());
+                setProperty(propertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
             }
         }
     }
 
     /**
-     * Set a configuration property to a specific value
-     * Properties that are prefixed with "dbevent." will have this prefix stripped
-     * Properties that are prefixed with "dbevent.debezium." or "debezium." will have these prefixes stripped before setting as Debezium config
-     * Properties that are not prefixed with "dbevent.debezium." or "debezium." are not added to the Debezium config,
-     * but are used for non-Debezium-specific configuration of the listener
+     * Sets the configuration property with the given name to the given value
      */
-    public void setProperty(String key, String value) {
-        String sourcePrefix = "dbevent." + sourceId + ".";
-        String debeziumPrefix = "debezium.";
-        if (key.toLowerCase().startsWith(sourcePrefix)) {
-            key = key.substring(sourcePrefix.length());
+    public void setProperty(String propertyName, String value) {
+        config.setProperty(propertyName, value);
+    }
+
+    /**
+     * Sets the configuration property for Debezium with the given name to the given value
+     * If the name is not prefixed with "debezium.", then this prefix is added
+     */
+    public void setDebeziumProperty(String propertyName, String value) {
+        if (!propertyName.toLowerCase().startsWith(DEBEZIUM_NAMESPACE)) {
+            propertyName = DEBEZIUM_NAMESPACE + propertyName;
         }
-        if (key.startsWith(debeziumPrefix)) {
-            String debeziumPropertyName = key.substring(debeziumPrefix.length());
-            debeziumConfig.setProperty(debeziumPropertyName, value);
+        setProperty(propertyName, value);
+    }
+
+    /**
+     * @return all configuration properties that used to configure debezium
+     */
+    public Properties getDebeziumProperties() {
+        Properties p = new Properties();
+        for (String propertyName : config.stringPropertyNames()) {
+            if (propertyName.toLowerCase().startsWith(DEBEZIUM_NAMESPACE)) {
+                p.setProperty(propertyName.substring(DEBEZIUM_NAMESPACE.length()), config.getProperty(propertyName));
+            }
         }
-        else {
-            listenerConfig.setProperty(key, value);
-        }
+        return p;
     }
 
     /**
      * @return the configured database name
      */
     public String getDatabaseName() {
-        String ret = debeziumConfig.getProperty("database.dbname");
+        String ret = config.getProperty(DEBEZIUM_NAMESPACE + "database.dbname");
         return ret == null ? null : ret.trim();
     }
 
@@ -114,7 +125,7 @@ public class DbEventListenerConfig {
             String tableConfig = tables.stream()
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
-            debeziumConfig.setProperty("table.include.list", tableConfig);
+            setDebeziumProperty("table.include.list", tableConfig);
         }
     }
 
@@ -123,7 +134,7 @@ public class DbEventListenerConfig {
      */
     public List<String> getIncludedTablePatterns() {
         List<String> ret = new ArrayList<>();
-        String val = debeziumConfig.getProperty("table.include.list");
+        String val = config.getProperty(DEBEZIUM_NAMESPACE + "table.include.list");
         if (val != null) {
             for (String tableName : val.split(",")) {
                 ret.add(tableName.trim());
@@ -142,7 +153,7 @@ public class DbEventListenerConfig {
             String tableConfig = tables.stream()
                     .map(t -> t.startsWith(tablePrefix) ? t : tablePrefix + t)
                     .collect(Collectors.joining(","));
-            debeziumConfig.setProperty("table.exclude.list", tableConfig);
+            setDebeziumProperty("table.exclude.list", tableConfig);
         }
     }
 
@@ -151,7 +162,7 @@ public class DbEventListenerConfig {
      */
     public List<String> getExcludedTablePatterns() {
         List<String> ret = new ArrayList<>();
-        String val = debeziumConfig.getProperty("table.exclude.list");
+        String val = config.getProperty(DEBEZIUM_NAMESPACE + "table.exclude.list");
         if (val != null) {
             for (String tableName : val.split(",")) {
                 ret.add(tableName.trim());
@@ -206,7 +217,7 @@ public class DbEventListenerConfig {
      */
     public int getRetryIntervalMillis() {
         try {
-            return Integer.parseInt(listenerConfig.getProperty("retryIntervalMillis"));
+            return Integer.parseInt(config.getProperty("retryIntervalMillis"));
         }
         catch (Exception e) {
             return 60000;
@@ -217,20 +228,20 @@ public class DbEventListenerConfig {
      * @return true if this listener is enabled, which is true by default
      */
     public boolean isEnabled() {
-        return Boolean.parseBoolean(listenerConfig.getProperty("enabled", "true"));
+        return Boolean.parseBoolean(config.getProperty("enabled", "true"));
     }
 
     /**
      * @return the currently configured offsets file
      */
     public File getOffsetsFile() {
-        return new File(debeziumConfig.getProperty("offset.storage.file.filename"));
+        return new File(config.getProperty(DEBEZIUM_NAMESPACE + "offset.storage.file.filename"));
     }
 
     /**
      * @return the currently configured database schema history file
      */
     public File getDatabaseHistoryFile() {
-        return new File(debeziumConfig.getProperty("database.history.file.filename"));
+        return new File(config.getProperty(DEBEZIUM_NAMESPACE + "database.history.file.filename"));
     }
 }

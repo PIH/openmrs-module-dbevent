@@ -30,7 +30,7 @@ public class DbEventSourceTest {
         DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location", "encounter_type"));
-        config.getListenerConfig().setProperty("retryIntervalMillis", "1000");
+        config.setProperty("retryIntervalMillis", "1000");
         TestEventListener listener = new TestEventListener();
         try {
             listener.init(config);

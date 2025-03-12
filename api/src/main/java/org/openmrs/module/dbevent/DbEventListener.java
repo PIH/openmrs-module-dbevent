@@ -8,7 +8,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.ThreadContext;
 import org.openmrs.module.dbevent.monitoring.DbEventListenerStatus;
 import org.openmrs.module.dbevent.monitoring.DbEventMonitor;
 
@@ -82,26 +81,12 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
     }
 
     /**
-     * This is the actual method that is implemented for each DbEvent.
-     * Subclasses should typically implement processEvent rather than override this method
-     * Sets up a logging context so that downstream log messages can access components of each event
+     * This is the actual method that is executed for each DbEvent.
+     * Subclasses should implement processEvent rather than override this method
      */
     @Override
     public final void accept(DbEvent event) {
-        try {
-            ThreadContext.put("timestamp", event.getTimestamp().toString());
-            ThreadContext.put("sourceName", event.getSourceName());
-            ThreadContext.put("table", event.getTable());
-            ThreadContext.put("operation", event.getOperation().name());
-            ThreadContext.put("key", event.getKey().toString());
-            ThreadContext.put("before", event.getBefore().toString());
-            ThreadContext.put("after", event.getAfter().toString());
-            ThreadContext.put("source", event.getSource().toString());
-            processEvent(event);
-        }
-        finally {
-            ThreadContext.clearAll();
-        }
+        processEvent(event);
     }
 
     /**
@@ -125,7 +110,7 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
         debeziumConsumer = new DebeziumConsumer(this);
         beforeProcessingEvents();
         engine = DebeziumEngine.create(Connect.class)
-                .using(config.getDebeziumConfig())
+                .using(config.getDebeziumProperties())
                 .notifying(debeziumConsumer)
                 .build();
 

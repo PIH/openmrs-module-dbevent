@@ -38,7 +38,20 @@ public class AuditLogger extends DbEventListener {
     public static final Marker AUDIT_LOG_MARKER = MarkerManager.getMarker("DBEVENT_AUDIT_LOG_MARKER");
 
     @Override
-    public void processEvent(DbEvent dbEvent) {
-        log.trace(AUDIT_LOG_MARKER, ThreadContext.getContext().toString());
+    public void processEvent(DbEvent event) {
+        try {
+            ThreadContext.put("timestamp", event.getTimestamp().toString());
+            ThreadContext.put("sourceName", event.getSourceName());
+            ThreadContext.put("table", event.getTable());
+            ThreadContext.put("operation", event.getOperation().name());
+            ThreadContext.put("key", event.getKey().toString());
+            ThreadContext.put("before", event.getBefore().toString());
+            ThreadContext.put("after", event.getAfter().toString());
+            ThreadContext.put("source", event.getSource().toString());
+            log.trace(AUDIT_LOG_MARKER, ThreadContext.getContext().toString());
+        }
+        finally {
+            ThreadContext.clearAll();
+        }
     }
 }
