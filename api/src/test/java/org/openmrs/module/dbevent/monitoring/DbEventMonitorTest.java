@@ -29,8 +29,8 @@ public class DbEventMonitorTest {
     @Test
     public void shouldStreamAndMonitorEvents() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
-        config.setProperty("debezium.snapshot.mode", "when_needed");
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setDebeziumProperty("snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("encounter_type", "location"));
         TestEventListener listener = new TestEventListener();
         try {
@@ -59,8 +59,8 @@ public class DbEventMonitorTest {
     @Test
     public void shouldLogErrorOfLatestEvent() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
-        config.setProperty("debezium.snapshot.mode", "when_needed");
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setDebeziumProperty("snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("encounter_type"));
         TestEventListener listener = new TestEventListener();
         listener.setSimulateErrorOnEvent(new EventMatcher(Operation.READ, "encounter_type", "encounter_type_id", 10L));

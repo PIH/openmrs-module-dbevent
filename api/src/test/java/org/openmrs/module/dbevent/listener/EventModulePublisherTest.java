@@ -31,8 +31,8 @@ public class EventModulePublisherTest {
     @Test
     public void shouldPublishEvents() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
-        config.setProperty("debezium.snapshot.mode", "when_needed");
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setDebeziumProperty("snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location"));
 
         final List<String> targetEvents = new ArrayList<>();

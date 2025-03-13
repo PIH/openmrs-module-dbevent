@@ -2,6 +2,8 @@ package org.openmrs.module.dbevent;
 
 import lombok.Data;
 import org.apache.commons.lang.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.openmrs.module.dbevent.database.DatabaseTable;
 
 import java.io.File;
@@ -22,22 +24,26 @@ import java.util.stream.Collectors;
 @Data
 public class DbEventListenerConfig {
 
+    private final Logger log = LogManager.getLogger(getClass());
+
     public static final String MODULE_PREFIX = "dbevent.";
     public static final String DEBEZIUM_NAMESPACE = "debezium.";
 
     private final Integer sourceId;
     private final String sourceName;
-    private final Properties config;
+    private final Properties debeziumProperties;
     private DbEventContext context;
+    private Integer retryIntervalMillis = 60000;
+    private boolean enabled = true;
 
     public DbEventListenerConfig(Integer sourceId, String sourceName) {
-        this(sourceId, sourceName, new Properties(), new DbEventContext());
+        this(sourceId, sourceName, new DbEventContext());
     }
 
-    public DbEventListenerConfig(Integer sourceId, String sourceName, Properties config, DbEventContext context) {
+    public DbEventListenerConfig(Integer sourceId, String sourceName, DbEventContext context) {
         this.sourceId = sourceId;
         this.sourceName = sourceName;
-        this.config = new Properties(config);
+        this.debeziumProperties = new Properties();
         this.context = context;
 
         File offsetsDataFile = new File(getDataDirectory(), "debezium_offsets.dat");
@@ -45,7 +51,6 @@ public class DbEventListenerConfig {
 
         // First set default values for configuration.  Debezium MySQL connector properties can be found here:
         // https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties
-        setProperty("retryIntervalMillis", "60000"); // By default, set 1 minute as the retry interval
         setDebeziumProperty("name", sourceName);
         setDebeziumProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
         setDebeziumProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
@@ -66,18 +71,6 @@ public class DbEventListenerConfig {
         setDebeziumProperty("database.port", context.getDatabase().getPort());
         setDebeziumProperty("database.dbname", context.getDatabase().getDatabaseName());
         setDebeziumProperty("database.include.list", context.getDatabase().getDatabaseName());
-
-        // Next, override these defaults with any specific configuration values that have been passed in, if any
-        this.config.putAll(config);
-
-        // Finally, runtime properties take precedence and override any configuration set in the code
-        for (String runtimePropertyName : context.getRuntimeProperties().stringPropertyNames()) {
-            String sourcePrefix = MODULE_PREFIX + sourceId + ".";
-            if (runtimePropertyName.toLowerCase().startsWith(sourcePrefix)) {
-                String propertyName = runtimePropertyName.substring(sourcePrefix.length());
-                setProperty(propertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
-            }
-        }
     }
 
     /**
@@ -88,31 +81,27 @@ public class DbEventListenerConfig {
     }
 
     /**
-     * Sets the configuration property with the given name to the given value
-     */
-    public void setProperty(String propertyName, String value) {
-        config.setProperty(propertyName, value);
-    }
-
-    /**
      * Sets the configuration property for Debezium with the given name to the given value
-     * If the name is not prefixed with "debezium.", then this prefix is added
+     * If the name is prefixed with "debezium.", then this prefix is stripped
      */
     public void setDebeziumProperty(String propertyName, String value) {
-        if (!propertyName.toLowerCase().startsWith(DEBEZIUM_NAMESPACE)) {
-            propertyName = DEBEZIUM_NAMESPACE + propertyName;
+        if (propertyName.toLowerCase().startsWith(DEBEZIUM_NAMESPACE)) {
+            propertyName = propertyName.substring(DEBEZIUM_NAMESPACE.length());
         }
-        setProperty(propertyName, value);
+        debeziumProperties.setProperty(propertyName, value);
     }
 
     /**
-     * @return all configuration properties that used to configure debezium
+     * @return the configured debezium properties, including any defaults and any overrides from runtime properties
      */
     public Properties getDebeziumProperties() {
         Properties p = new Properties();
-        for (String propertyName : config.stringPropertyNames()) {
-            if (propertyName.toLowerCase().startsWith(DEBEZIUM_NAMESPACE)) {
-                p.setProperty(propertyName.substring(DEBEZIUM_NAMESPACE.length()), config.getProperty(propertyName));
+        p.putAll(debeziumProperties);
+        String prefix = MODULE_PREFIX + sourceName + "." + DEBEZIUM_NAMESPACE;
+        for (String runtimePropertyName : context.getRuntimeProperties().stringPropertyNames()) {
+            if (runtimePropertyName.startsWith(prefix)) {
+                String debeziumPropertyName = runtimePropertyName.substring(prefix.length());
+                p.setProperty(debeziumPropertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
             }
         }
         return p;
@@ -122,7 +111,7 @@ public class DbEventListenerConfig {
      * @return the configured database name
      */
     public String getDatabaseName() {
-        String ret = config.getProperty(DEBEZIUM_NAMESPACE + "database.dbname");
+        String ret = debeziumProperties.getProperty("database.dbname");
         return ret == null ? null : ret.trim();
     }
 
@@ -145,7 +134,7 @@ public class DbEventListenerConfig {
      */
     public List<String> getIncludedTablePatterns() {
         List<String> ret = new ArrayList<>();
-        String val = config.getProperty(DEBEZIUM_NAMESPACE + "table.include.list");
+        String val = debeziumProperties.getProperty("table.include.list");
         if (val != null) {
             for (String tableName : val.split(",")) {
                 ret.add(tableName.trim());
@@ -173,7 +162,7 @@ public class DbEventListenerConfig {
      */
     public List<String> getExcludedTablePatterns() {
         List<String> ret = new ArrayList<>();
-        String val = config.getProperty(DEBEZIUM_NAMESPACE + "table.exclude.list");
+        String val = debeziumProperties.getProperty("table.exclude.list");
         if (val != null) {
             for (String tableName : val.split(",")) {
                 ret.add(tableName.trim());
@@ -227,32 +216,66 @@ public class DbEventListenerConfig {
      * @return the configured retry interval in milliseconds, in case of a processing error;  defaults to 1 minute
      */
     public int getRetryIntervalMillis() {
-        try {
-            return Integer.parseInt(config.getProperty("retryIntervalMillis"));
-        }
-        catch (Exception e) {
-            return 60000;
-        }
+        return getIntegerRuntimePropertyValue("retryIntervalMillis", retryIntervalMillis);
     }
 
     /**
      * @return true if this listener is enabled, which is true by default
      */
     public boolean isEnabled() {
-        return Boolean.parseBoolean(config.getProperty("enabled", "true"));
+        return getBooleanRuntimePropertyValue("enabled", enabled);
     }
 
     /**
      * @return the currently configured offsets file
      */
     public File getOffsetsFile() {
-        return new File(config.getProperty(DEBEZIUM_NAMESPACE + "offset.storage.file.filename"));
+        return new File(debeziumProperties.getProperty("offset.storage.file.filename"));
     }
 
     /**
      * @return the currently configured database schema history file
      */
     public File getDatabaseHistoryFile() {
-        return new File(config.getProperty(DEBEZIUM_NAMESPACE + "database.history.file.filename"));
+        return new File(debeziumProperties.getProperty("database.history.file.filename"));
+    }
+
+    /**
+     * @return the runtime property value configured for this particular sourceId
+     */
+    public String getRuntimePropertyValue(String property) {
+        return context.getRuntimeProperties().getProperty(MODULE_PREFIX + sourceId + "." + property);
+    }
+
+    /**
+     * @return a runtime property value configured for this DbEvent sourceId parsed into an Integer
+     */
+    public Integer getIntegerRuntimePropertyValue(String property, Integer defaultValue) {
+        String value = getRuntimePropertyValue(property);
+        if (StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        }
+        catch (NumberFormatException e) {
+            throw new IllegalStateException("Invalid integer configuration for " + property + "=" + value);
+        }
+    }
+
+    /**
+     * @return a runtime property value configured for this DbEvent sourceId parsed into a boolean
+     */
+    public boolean getBooleanRuntimePropertyValue(String property, boolean defaultValue) {
+        String value = getRuntimePropertyValue(property);
+        if (StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Boolean.parseBoolean(value);
+        }
+        catch (NumberFormatException e) {
+            throw new IllegalStateException("Invalid boolean configuration for " + property + "=" + value);
+        }
     }
 }
