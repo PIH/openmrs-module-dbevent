@@ -12,6 +12,7 @@ import org.openmrs.module.dbevent.test.TestUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Properties;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -27,7 +28,7 @@ public class DbEventSourceTest {
     @Test
     public void shouldStartAndStopEventSource() throws Exception {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location", "encounter_type"));
         config.setProperty("retryIntervalMillis", "1000");
@@ -46,7 +47,7 @@ public class DbEventSourceTest {
     @Test
     public void shouldStartAndStopAndRestart() throws Exception {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("location"));
         TestEventListener listener = new TestEventListener();

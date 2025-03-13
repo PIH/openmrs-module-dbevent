@@ -15,6 +15,7 @@ import org.openmrs.module.dbevent.test.TestUtils;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -48,7 +49,7 @@ public class AuditLoggerTest extends BaseDbEventTest {
     @Test
     public void shouldLogLines() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location"));
         AuditLogger listener = new AuditLogger();

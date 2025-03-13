@@ -28,24 +28,24 @@ public class DbEventListenerConfig {
     private final Integer sourceId;
     private final String sourceName;
     private final Properties config;
-    private final DbEventContext context;
+    private DbEventContext context;
 
     public DbEventListenerConfig(Integer sourceId, String sourceName) {
-        this(sourceId, sourceName, new DbEventContext());
+        this(sourceId, sourceName, new Properties(), new DbEventContext());
     }
 
-    public DbEventListenerConfig(Integer sourceId, String sourceName, DbEventContext context) {
+    public DbEventListenerConfig(Integer sourceId, String sourceName, Properties config, DbEventContext context) {
         this.sourceId = sourceId;
         this.sourceName = sourceName;
+        this.config = new Properties(config);
         this.context = context;
-        this.config = new Properties();
-        File offsetsDataFile = new File(context.getModuleDataDir(), sourceId + "_offsets.dat");
-        File schemaHistoryDataFile = new File(context.getModuleDataDir(), sourceId + "_schema_history.dat");
 
-        setProperty("retryIntervalMillis", "60000"); // By default, set 1 minute as the retry interval
+        File offsetsDataFile = new File(getDataDirectory(), "debezium_offsets.dat");
+        File schemaHistoryDataFile = new File(getDataDirectory(), "debezium_schema_history.dat");
 
-        // Initialize default values for source configuration.  The full list for MySQL connector properties is here:
+        // First set default values for configuration.  Debezium MySQL connector properties can be found here:
         // https://debezium.io/documentation/reference/stable/connectors/mysql.html#mysql-connector-properties
+        setProperty("retryIntervalMillis", "60000"); // By default, set 1 minute as the retry interval
         setDebeziumProperty("name", sourceName);
         setDebeziumProperty("connector.class", "io.debezium.connector.mysql.MySqlConnector");
         setDebeziumProperty("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore");
@@ -66,7 +66,11 @@ public class DbEventListenerConfig {
         setDebeziumProperty("database.port", context.getDatabase().getPort());
         setDebeziumProperty("database.dbname", context.getDatabase().getDatabaseName());
         setDebeziumProperty("database.include.list", context.getDatabase().getDatabaseName());
-        
+
+        // Next, override these defaults with any specific configuration values that have been passed in, if any
+        this.config.putAll(config);
+
+        // Finally, runtime properties take precedence and override any configuration set in the code
         for (String runtimePropertyName : context.getRuntimeProperties().stringPropertyNames()) {
             String sourcePrefix = MODULE_PREFIX + sourceId + ".";
             if (runtimePropertyName.toLowerCase().startsWith(sourcePrefix)) {
@@ -74,6 +78,13 @@ public class DbEventListenerConfig {
                 setProperty(propertyName, context.getRuntimeProperties().getProperty(runtimePropertyName));
             }
         }
+    }
+
+    /**
+     * @return the data directory that should be used to for this listener to record processing information
+     */
+    public File getDataDirectory() {
+        return new File(context.getModuleDataDir(), sourceId.toString());
     }
 
     /**

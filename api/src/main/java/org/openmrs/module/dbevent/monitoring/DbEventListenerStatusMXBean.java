@@ -14,6 +14,7 @@ public interface DbEventListenerStatusMXBean {
     boolean isLatestEventProcessed();
     String getLatestEventErrorMessage();
     Long getLatestEventErrorRetryNum();
+    long getNumberOfEvents();
     long getNumberOfReads();
     long getNumberOfInserts();
     long getNumberOfUpdates();

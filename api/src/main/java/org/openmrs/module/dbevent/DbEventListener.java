@@ -75,9 +75,12 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
      * Allows for resetting the source.  This deletes any existing history and offset files
      */
     public void reset() {
-        log.info("Resetting Event Source: {}", config.getSourceId());
-        FileUtils.deleteQuietly(config.getOffsetsFile());
-        FileUtils.deleteQuietly(config.getDatabaseHistoryFile());
+        log.info("Resetting Event Listener: {}", config.getSourceId());
+        if (config.getDataDirectory().exists()) {
+            if (!FileUtils.deleteQuietly(config.getDataDirectory())) {
+                throw new IllegalStateException("Error resetting listener. Unable to delete data directory at: " + config.getDataDirectory());
+            }
+        }
     }
 
     /**
@@ -97,11 +100,14 @@ public abstract class DbEventListener implements Consumer<DbEvent> {
         log.trace("{} - configuration: {}", config.getSourceName(), config);
         log.trace("{} - monitoring tables: {}", config.getSourceName(), config.getMonitoredTables());
 
+        if (config.getDataDirectory().mkdirs()) {
+            log.info("Created data directory: {}", config.getDataDirectory());
+        }
         if (config.getOffsetsFile().getParentFile().mkdirs()) {
-            log.info("Created directory: {}", config.getOffsetsFile().getParentFile());
+            log.info("Created offsets file directory: {}", config.getOffsetsFile().getParentFile());
         }
         if (config.getDatabaseHistoryFile().getParentFile().mkdirs()) {
-            log.info("Created directory: {}", config.getOffsetsFile().getParentFile());
+            log.info("Created database history file directory: {}", config.getOffsetsFile().getParentFile());
         }
 
         getStatus().initialize(this);

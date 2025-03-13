@@ -13,6 +13,7 @@ import org.openmrs.module.dbevent.test.TestUtils;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -28,7 +29,7 @@ public class DbEventMonitorTest {
     @Test
     public void shouldStreamAndMonitorEvents() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("encounter_type", "location"));
         TestEventListener listener = new TestEventListener();
@@ -58,7 +59,7 @@ public class DbEventMonitorTest {
     @Test
     public void shouldLogErrorOfLatestEvent() {
         DbEventContext ctx = MysqlExtension.getEventContext();
-        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, new Properties(), ctx);
         config.setProperty("debezium.snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("encounter_type"));
         TestEventListener listener = new TestEventListener();

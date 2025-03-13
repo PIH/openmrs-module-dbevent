@@ -19,6 +19,7 @@ public class DbEventListenerStatus implements DbEventListenerStatusMXBean {
     private boolean latestEventProcessed = false;
     private String latestEventErrorMessage;
     private Long latestEventErrorRetryNum;
+    private long numberOfEvents = 0;
     private long numberOfReads = 0;
     private long numberOfInserts = 0;
     private long numberOfUpdates = 0;
@@ -46,6 +47,7 @@ public class DbEventListenerStatus implements DbEventListenerStatusMXBean {
         setLatestEventErrorMessage(null);
         setLatestEventErrorRetryNum(null);
         Operation operation = dbEvent.getOperation();
+        numberOfEvents++;
         if (operation == Operation.READ) {
             numberOfReads++;
         }
