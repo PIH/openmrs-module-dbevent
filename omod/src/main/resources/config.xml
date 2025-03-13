@@ -12,4 +12,8 @@
 
 	<require_version>${openmrsVersion}</require_version>
 
+	<aware_of_modules>
+		<aware_of_module>org.openmrs.event</aware_of_module>
+	</aware_of_modules>
+
 </module>

@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.openmrs.module.dbevent.database.Database;
 import org.openmrs.module.dbevent.test.EventMatcher;
 import org.openmrs.module.dbevent.test.MysqlExtension;
-import org.openmrs.module.dbevent.test.TestEventConsumer;
+import org.openmrs.module.dbevent.test.TestEventListener;
 import org.openmrs.module.dbevent.test.TestUtils;
 
 import java.util.Arrays;
@@ -26,59 +26,57 @@ public class DbEventSourceTest {
 
     @Test
     public void shouldStartAndStopEventSource() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
-        DbEventSourceConfig config = new DbEventSourceConfig(100002, SOURCE, ctx);
+        DbEventContext ctx = MysqlExtension.getEventContext();
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setDebeziumProperty("snapshot.mode", "when_needed");
         config.configureTablesToInclude(Arrays.asList("location", "encounter_type"));
-        config.setRetryIntervalSeconds(1);
-        DbEventSource eventSource = new DbEventSource(config);
-        TestEventConsumer eventConsumer = new TestEventConsumer();
-        eventSource.setEventConsumer(eventConsumer);
+        config.setRetryIntervalMillis(1000);
+        TestEventListener listener = new TestEventListener();
         try {
-            eventSource.start();
+            listener.init(config);
             TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 10);
         }
         finally {
-            eventSource.stop();
-            log.debug("Event source stopped.  Num events received: " + eventConsumer.getNumEvents());
+            listener.stop();
+            log.debug("Event source stopped.  Num events received: " + listener.getNumEvents());
         }
-        assertTrue(eventConsumer.getNumEvents() >= 10);
+        assertTrue(listener.getNumEvents() >= 10);
     }
 
     @Test
     public void shouldStartAndStopAndRestart() throws Exception {
-        EventContext ctx = MysqlExtension.getEventContext();
-        DbEventSourceConfig config = new DbEventSourceConfig(100002, SOURCE, ctx);
+        DbEventContext ctx = MysqlExtension.getEventContext();
+        DbEventListenerConfig config = new DbEventListenerConfig(100002, SOURCE, ctx);
+        config.setDebeziumProperty("snapshot.mode", "when_needed");
         config.configureTablesToInclude(Collections.singletonList("location"));
-        DbEventSource eventSource = new DbEventSource(config);
-        TestEventConsumer eventConsumer = new TestEventConsumer();
-        eventConsumer.setSimulateErrorOnEvent(new EventMatcher(Operation.UPDATE, "location", "location_id", 2));
-        eventSource.setEventConsumer(eventConsumer);
+        TestEventListener listener = new TestEventListener();
+        listener.setSimulateErrorOnEvent(new EventMatcher(Operation.UPDATE, "location", "location_id", 2));
         final Database db = ctx.getDatabase();
         try {
-            eventSource.start();
+            listener.init(config);
             TestUtils.waitForSnapshotToStart(SOURCE);
             db.executeUpdate("update location set date_changed = now() where location_id = 1");
             db.executeUpdate("update location set date_changed = now() where location_id = 2");
             TestUtils.waitForNumberOfStreamingEvents(SOURCE, 1);
         }
         finally {
-            eventSource.stop();
+            listener.stop();
         }
         EventMatcher matcher = new EventMatcher(Operation.UPDATE, "location", "location_id", 1);
-        assertTrue(matcher.matches(eventConsumer.getLastEvent()));
+        assertTrue(matcher.matches(listener.getLastEvent()));
 
         // Remove the forced error condition and restart
-        eventConsumer.getEvents().clear();
-        eventConsumer.setSimulateErrorOnEvent(null);
+        listener.getEvents().clear();
+        listener.setSimulateErrorOnEvent(null);
         try {
-            eventSource.start();
+            listener.start();
             TestUtils.waitForNumberOfStreamingEvents(SOURCE, 1);
         }
         finally {
-            eventSource.stop();
+            listener.stop();
         }
-        assertThat(eventConsumer.getNumEvents(), equalTo(1));
+        assertThat(listener.getNumEvents(), equalTo(1));
         matcher = new EventMatcher(Operation.UPDATE, "location", "location_id", 2);
-        assertTrue(matcher.matches(eventConsumer.getLastEvent()));
+        assertTrue(matcher.matches(listener.getLastEvent()));
     }
 }

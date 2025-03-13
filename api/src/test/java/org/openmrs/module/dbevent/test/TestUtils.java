@@ -1,6 +1,6 @@
 package org.openmrs.module.dbevent.test;
 
-import org.openmrs.module.dbevent.DbEventLog;
+import org.openmrs.module.dbevent.monitoring.DbEventMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ public class TestUtils {
 
     public static Map<String, Object> getSnapshotAttributes(String sourceName) {
         try {
-            return DbEventLog.getSnapshotMonitoringAttributes(sourceName);
+            return DbEventMonitor.getSnapshotMonitoringAttributes(sourceName);
         }
         catch (Exception e) {
             return new HashMap<>();
@@ -63,7 +63,7 @@ public class TestUtils {
 
     public static Map<String, Object> getStreamingAttributes(String sourceName) {
         try {
-            return DbEventLog.getStreamingMonitoringAttributes(sourceName);
+            return DbEventMonitor.getStreamingMonitoringAttributes(sourceName);
         }
         catch (Exception e) {
             return new HashMap<>();

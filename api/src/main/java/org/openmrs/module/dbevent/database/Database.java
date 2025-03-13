@@ -55,7 +55,7 @@ public class Database implements Serializable {
             }
         }
         catch (Exception e) {
-            throw new IllegalArgumentException("Invalid connection.url: " + url);
+            throw new IllegalArgumentException("Error parsing connection url: " + url, e);
         }
     }
 
