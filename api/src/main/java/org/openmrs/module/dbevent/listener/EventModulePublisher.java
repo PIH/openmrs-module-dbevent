@@ -16,11 +16,14 @@ import java.util.Objects;
  */
 public class EventModulePublisher extends DbEventListener {
 
-    public final static String TOPIC_PREFIX = "org.openmrs.module.dbevent:";
+    private final String topicName;
+
+    public EventModulePublisher(String topicName) {
+        this.topicName = topicName;
+    }
 
     @Override
     public void processEvent(DbEvent dbEvent) {
-        String topicName = TOPIC_PREFIX + dbEvent.getTable();
         EventMessage eventMessage = new EventMessage();
         eventMessage.put("timestamp", dbEvent.getTimestamp());
         eventMessage.put("table", dbEvent.getTable());

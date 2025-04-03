@@ -25,6 +25,7 @@ public class EventModulePublisherTest {
 
     private static final Logger log = LogManager.getLogger(EventModulePublisherTest.class);
 
+    public static final String TOPIC_NAME = "dbevent";
     public static final String SOURCE = "TEST_SOURCE";
 
     @Test
@@ -36,7 +37,7 @@ public class EventModulePublisherTest {
 
         final List<String> targetEvents = new ArrayList<>();
 
-        Event.subscribe(EventModulePublisher.TOPIC_PREFIX + "location", message -> {
+        Event.subscribe(TOPIC_NAME, message -> {
             try {
                 MapMessage mapMessage = (MapMessage) message;
                 Long timestamp = mapMessage.getLong("timestamp");
@@ -55,7 +56,7 @@ public class EventModulePublisherTest {
             }
         });
 
-        EventModulePublisher listener = new EventModulePublisher();
+        EventModulePublisher listener = new EventModulePublisher(TOPIC_NAME);
         try {
             listener.init(config);
             TestUtils.waitForNumberOfSnapshotEvents(SOURCE, 5);
