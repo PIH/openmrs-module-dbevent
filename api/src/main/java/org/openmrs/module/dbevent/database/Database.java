@@ -107,10 +107,16 @@ public class Database implements Serializable {
                             String fkColumnName = fkRs.getString("FKCOLUMN_NAME").toLowerCase();
                             String pkColumnName = fkRs.getString("PKCOLUMN_NAME").toLowerCase();
                             DatabaseColumn pkColumn = table.getColumns().get(pkColumnName);
-                            DatabaseTable fkTable = metadata.getTables().get(fkTableName);
-                            DatabaseColumn fkColumn = fkTable.getColumns().get(fkColumnName);
-                            pkColumn.getReferencedBy().add(fkColumn);
-                            fkColumn.getReferences().add(pkColumn);
+                            if (pkColumn != null) {
+                                DatabaseTable fkTable = metadata.getTables().get(fkTableName);
+                                if (fkTable != null) {
+                                    DatabaseColumn fkColumn = fkTable.getColumns().get(fkColumnName);
+                                    if (fkColumn != null) {
+                                        pkColumn.getReferencedBy().add(fkColumn);
+                                        fkColumn.getReferences().add(pkColumn);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
